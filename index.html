@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>タスク記録</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#16a34a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="タスク記録">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    /* ═══════════════════════════════ BASE ═══ */
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      background: #f4faf6;
+      color: #1a3a22;
+    }
+
+    /* ═══════════════════════════════ VIEWS ═══ */
+    .view {
+      position: fixed; inset: 0;
+      overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      background: #f4faf6;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      will-change: transform;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    }
+    #view-home   { transform: translateX(0); z-index: 1; }
+    #view-detail { transform: translateX(100%); z-index: 2; }
+    #view-detail.active { transform: translateX(0); }
+    #view-home.pushed   { transform: translateX(-22%); }
+
+    /* ═══════════════════════════════ HEADER ═══ */
+    .app-header {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(244,250,246,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex; align-items: center;
+      padding: max(14px, calc(10px + env(safe-area-inset-top))) 16px 12px;
+      gap: 10px;
+      border-bottom: 1px solid #d1edd9;
+    }
+    .header-title {
+      flex: 1; display: flex; align-items: center; gap: 8px;
+    }
+    .header-title h1 {
+      font-size: 1.15rem; font-weight: 800;
+      letter-spacing: 0.06em; color: #15803d;
+    }
+    .header-title h2 {
+      font-size: 1rem; font-weight: 700; color: #1a3a22;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .header-emoji { font-size: 1.2rem; }
+    .icon-btn {
+      background: none; border: none; cursor: pointer;
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: #16a34a; font-size: 1.1rem; font-weight: 700;
+      transition: background 0.15s;
+    }
+    .icon-btn:active { background: #dcfce7; }
+    #btnAdd {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: #16a34a; color: #fff;
+      font-size: 1.4rem; line-height: 1;
+    }
+    #btnAdd:active { background: #15803d; }
+    .back-btn {
+      display: flex; align-items: center; gap: 4px;
+      background: none; border: none; cursor: pointer;
+      color: #16a34a; font-size: 0.88rem; font-weight: 700;
+      padding: 4px 2px; border-radius: 8px;
+      white-space: nowrap;
+    }
+    .back-btn:active { opacity: 0.6; }
+
+    /* ═══════════════════════════════ HOME ─ TODAY BAR ═══ */
+    .today-bar {
+      margin: 14px 16px 0;
+      background: #fff; border-radius: 16px;
+      padding: 12px 16px;
+      border: 1px solid #d1edd9;
+      box-shadow: 0 2px 8px rgba(22,163,74,0.07);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .today-bar .tb-left { font-size: 0.78rem; color: #4b7a5a; font-weight: 600; }
+    .today-bar .tb-left strong { color: #15803d; font-size: 1rem; }
+    .today-bar .tb-pips { display: flex; gap: 5px; align-items: center; }
+    .tb-pip {
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid currentColor;
+    }
+    .tb-pip.done { background: currentColor; }
+
+    /* ═══════════════════════════════ HOME ─ SUPP CARDS ═══ */
+    .supp-list {
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 12px 16px 8px;
+    }
+    .supp-card {
+      background: #fff; border-radius: 18px;
+      border: 1.5px solid #d1edd9;
+      box-shadow: 0 2px 10px rgba(22,163,74,0.07);
+      overflow: hidden; cursor: pointer;
+      transition: box-shadow 0.18s, transform 0.12s;
+      position: relative;
+    }
+    .supp-card:active { transform: scale(0.98); }
+    .supp-card .card-accent {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 5px; border-radius: 18px 0 0 18px;
+    }
+    .supp-card .card-body {
+      padding: 13px 14px 13px 18px;
+      display: flex; flex-direction: column; gap: 9px;
+    }
+    /* top row */
+    .card-top {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-emoji { font-size: 1.3rem; line-height: 1; }
+    .card-name  {
+      flex: 1; font-size: 0.95rem; font-weight: 700;
+      color: #1a3a22; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .card-streak-badge {
+      font-size: 0.7rem; font-weight: 800;
+      background: #f0faf4; color: #15803d;
+      border: 1px solid #d1edd9; border-radius: 8px;
+      padding: 2px 7px; white-space: nowrap;
+    }
+    .card-streak-badge.hot { background: #fef3c7; color: #d97706; border-color: #fde68a; }
+    /* mini week icons */
+    .card-week {
+      display: grid; grid-template-columns: repeat(7,1fr); gap: 6px;
+      align-items: end;
+    }
+    .mini-day {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      min-width: 0;
+    }
+    .mini-label {
+      font-size: clamp(1rem, 2.6vw, 1.4rem); font-weight: 800;
+      color: #86b898; letter-spacing: 0.04em;
+    }
+    .mini-cell {
+      width: clamp(44px, 11vw, 82px); /* モバイル〜デスクトップで適切なサイズ */
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 1.5px solid #d1edd9;
+      background: #f9fefb;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+    .mini-cell svg { width: 76%; height: 76%; }
+    .mini-cell.future { opacity: 0.3; }
+    .mini-cell.today-ring {
+      border-color: #16a34a;
+      box-shadow: 0 0 0 3px #bbf7d0;
+    }
+    .mini-cell.taken-cell {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+    /* bottom row */
+    .card-bottom {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-total {
+      font-size: 0.68rem; color: #86b898; font-weight: 600;
+    }
+    .take-btn {
+      border: none; cursor: pointer; border-radius: 10px;
+      font-size: 0.82rem; font-weight: 800;
+      padding: 7px 16px;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .take-btn.not-taken {
+      background: #f0faf4; color: #16a34a;
+      border: 1.5px solid #d1edd9;
+    }
+    .take-btn.not-taken:active { background: #dcfce7; transform: scale(0.95); }
+    .take-btn.taken {
+      background: #16a34a; color: #fff; border: 1.5px solid transparent;
+    }
+    .take-btn.taken:active { background: #15803d; transform: scale(0.95); }
+
+    /* ═══════════════════════════════ EMPTY STATE ═══ */
+    .empty-state {
+      text-align: center; padding: 60px 32px;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .empty-state .empty-icon { font-size: 3.5rem; }
+    .empty-state p { color: #4b7a5a; font-size: 0.9rem; font-weight: 600; }
+    .empty-state .btn-start {
+      background: #16a34a; color: #fff; border: none;
+      border-radius: 14px; padding: 12px 28px;
+      font-size: 0.9rem; font-weight: 800; cursor: pointer;
+    }
+
+    /* ═══════════════════════════════ DETAIL ─ LAYOUT GRID ═══ */
+    /* モバイル: 縦積み */
+    .detail-layout {
+      display: flex; flex-direction: column; gap: 20px;
+      padding: 18px 16px 32px;
+    }
+
+    /* デスクトップ: 3カラム・1画面に収まるグリッド */
+    /* ─ タブレット以上: 共通グリッド基盤 + 月間カレンダー修正 ─ */
+    @media (min-width: 600px) {
+      /* 月間セル: aspect-ratio:auto を明示（Safari で unset が効かないため） */
+      .month-section {
+        grid-area: month; align-self: stretch;
+        display: flex; flex-direction: column; min-height: 0;
+        padding: 10px 12px 8px;
+        overflow: hidden;
+      }
+      .month-grid { flex: 1; min-height: 0; overflow: hidden; }
+      .month-cell {
+        aspect-ratio: auto !important;
+        min-height: 0;
+        font-size: clamp(0.85rem, 2.2vh, 1.8rem);
+        font-weight: 800;
+        border-color: transparent;
+        outline: none;
+      }
+      .month-cell.today {
+        border-color: #16a34a !important;
+        border-width: 2.5px;
+      }
+
+      /* タブレット 2カラム (600–859px): week+month 左, stats 右, memo 下 */
+      .detail-layout {
+        display: grid;
+        grid-template-columns: 1fr minmax(138px, 162px);
+        grid-template-rows: auto 1fr auto;
+        grid-template-areas:
+          "week  stats"
+          "month stats"
+          "memo  memo";
+        gap: 14px;
+        padding: 14px 16px 16px;
+      }
+      .memo-section  { grid-area: memo; display: flex; flex-direction: column; }
+      .memo-textarea { min-height: 110px; resize: vertical; }
+      .week-section  { grid-area: week;  align-self: start; }
+      .detail-stats  { grid-area: stats; align-self: start; flex-direction: column; align-items: stretch; }
+    }
+
+    /* ─ デスクトップ: 3カラム, 1画面に収まるレイアウト (860px+) ─ */
+    @media (min-width: 860px) {
+      #view-detail { overflow: hidden; display: flex; flex-direction: column; }
+
+      .detail-layout {
+        flex: 1; min-height: 0;
+        grid-template-columns: minmax(185px, 225px) 1fr minmax(165px, 200px);
+        grid-template-rows: auto 1fr;
+        grid-template-areas:
+          "memo week  stats"
+          "memo month stats";
+        gap: 16px;
+        padding: 14px 16px 12px;
+      }
+      .memo-section  { align-self: stretch; }
+      .memo-textarea { flex: 1; resize: none; min-height: 0; }
+    }
+
+    /* ═══════════════════════════════ DETAIL ─ MEMO ═══ */
+    .memo-section { display: flex; flex-direction: column; gap: 10px; }
+    .memo-textarea {
+      width: 100%; min-height: 180px;
+      border: 1.5px solid #d1edd9; border-radius: 16px;
+      padding: 16px 18px;
+      font-size: 1.15rem; font-family: inherit;
+      color: #1a3a22; background: #fff;
+      outline: none; resize: vertical; line-height: 1.8;
+      box-shadow: 0 2px 8px rgba(22,163,74,0.05);
+      transition: border-color 0.15s;
+    }
+    .memo-textarea:focus { border-color: #16a34a; box-shadow: 0 0 0 4px #bbf7d040; }
+    .memo-textarea::placeholder { color: #b0ccb8; }
+
+    /* ═══════════════════════════════ DETAIL ─ STATS ═══ */
+    .detail-stats { display: flex; gap: 10px; }
+    .stat-card {
+      flex: 1;
+      background: #fff; border: 1.5px solid #d1edd9;
+      border-radius: clamp(12px,2vw,18px); padding: clamp(10px,2vw,14px) clamp(10px,2.5vw,16px) clamp(8px,1.8vw,12px);
+      box-shadow: 0 2px 10px rgba(22,163,74,0.1);
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      min-width: 0;
+    }
+    .stat-card .sc-icon { font-size: clamp(1.2rem, 2.5vw, 1.6rem); line-height: 1; }
+    .stat-card .sc-num  {
+      font-size: clamp(1.6rem, 3.5vw, 2.6rem); font-weight: 900;
+      color: #15803d; line-height: 1; letter-spacing: -0.02em;
+    }
+    .stat-card .sc-unit {
+      font-size: 0.78rem; font-weight: 800;
+      color: #86b898; letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    #streakCard.hot .sc-num { color: #d97706; }
+    #streakCard.hot { border-color: #fde68a; }
+    #totalCard .sc-num { color: #0d9488; }
+    #totalCard { border-color: #ccfbf1; }
+
+    /* ═══════════════════════════════ DETAIL ─ WEEK ═══ */
+    .week-section { }
+    .section-label {
+      font-size: clamp(0.78rem, 1.8vw, 1.05rem); letter-spacing: 0.1em; text-transform: uppercase;
+      color: #16a34a; margin-bottom: clamp(8px, 1.5vw, 12px); font-weight: 800;
+    }
+    .week-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: clamp(3px,1.2vw,8px); }
+    .week-cell {
+      aspect-ratio: 1; border-radius: 18px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; border: 1.5px solid #d1edd9;
+      background: #fff; box-shadow: 0 2px 8px rgba(22,163,74,0.07);
+      user-select: none; position: relative; gap: 2px;
+      transition: transform 0.1s;
+    }
+    .week-cell:active { transform: scale(0.92); }
+    .week-cell.today { border-color: #16a34a; box-shadow: 0 0 0 4px #bbf7d0; }
+    .week-cell.future { opacity: 0.3; pointer-events: none; }
+    .week-cell .day-name {
+      font-size: clamp(0.75rem, 1.8vw, 1.1rem); font-weight: 800;
+      letter-spacing: 0.04em; color: #86b898;
+    }
+    .week-cell.today .day-name { color: #16a34a; }
+    .week-cell .day-num {
+      font-size: clamp(1.4rem, 3.5vw, 2.2rem); font-weight: 700; line-height: 1; color: #1a3a22;
+    }
+    .week-cell .pill-wrap {
+      height: clamp(28px, 7vw, 46px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .week-cell .pill-wrap svg { width: clamp(36px, 9vw, 56px); height: auto; }
+    .week-cell .streak-badge {
+      position: absolute; top: 5px; right: 6px;
+      font-size: 0.72rem; font-weight: 800;
+      background: rgba(22,163,74,0.15); border-radius: 7px;
+      padding: 2px 6px; color: #15803d; line-height: 1.5;
+    }
+    [class*="taken-"] .streak-badge { background: rgba(0,0,0,0.18); color: #fff; }
+    .taken-5 .day-num,.taken-6 .day-num,.taken-7 .day-num,
+    .taken-8 .day-num,.taken-9 .day-num,.taken-10 .day-num { color:#f0fdf4; }
+    .taken-5 .day-name,.taken-6 .day-name,.taken-7 .day-name,
+    .taken-8 .day-name,.taken-9 .day-name,.taken-10 .day-name { color:#bbf7d0; }
+
+    /* ═══════════════════════════════ DETAIL ─ MONTH ═══ */
+    .month-section {
+      background: #fff; border-radius: 24px;
+      padding: 20px 18px 24px;
+      box-shadow: 0 2px 14px rgba(22,163,74,0.08);
+      border: 1px solid #d1edd9;
+    }
+    .month-nav {
+      display: flex; align-items: center; justify-content: center;
+      gap: 20px; margin-bottom: 14px;
+    }
+    .month-nav button {
+      background: none; border: none; color: #16a34a;
+      font-size: clamp(1.4rem, 3vw, 2rem); cursor: pointer;
+      padding: clamp(4px,1vw,8px) clamp(8px,2vw,16px);
+      border-radius: 10px; line-height: 1;
+    }
+    .month-nav button:active { background: #f0faf4; }
+    .month-title { font-size: clamp(0.95rem, 2.5vw, 1.4rem); font-weight: 800; letter-spacing: 0.08em; color: #15803d; }
+    /* 曜日ヘッダー行（グリッド外・別div） */
+    .month-dow-row {
+      display: grid; grid-template-columns: repeat(7,1fr); gap: 6px;
+      flex-shrink: 0; margin-bottom: 4px;
+    }
+    .month-dow-row span {
+      text-align: center; font-size: 0.95rem; font-weight: 800;
+      color: #86b898; padding: 2px 0 6px; display: block;
+    }
+    .month-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: clamp(2px,1vw,6px); }
+    .month-cell {
+      /* aspect-ratio は @media (max-width:599px) のみで設定 */
+      border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: clamp(0.9rem, 2.2vw, 1.3rem); font-weight: 700;
+      cursor: pointer; background: #f0faf4; color: #2d6a4a;
+      border: 1px solid #d1edd9; user-select: none;
+      transition: background 0.12s;
+      outline: none; -webkit-tap-highlight-color: transparent;
+      position: relative; overflow: hidden; gap: 1px;
+    }
+    @media (max-width: 599px) {
+      .month-cell { aspect-ratio: 1; }
+    }
+    .cell-day  { line-height: 1; }
+    .cell-time { font-size: 0.55em; font-weight: 600; opacity: 0.75; line-height: 1; }
+    .month-cell:active:not(.future):not(.empty) { background: #dcf5e6; }
+    .month-cell.today { border-color:#16a34a; border-width:2.5px; color:#14532d; background:#bbf7d0; font-weight:900; }
+    .month-cell.future { opacity:0.28; pointer-events:none; }
+    .month-cell.empty  { background:none; border-color:transparent; pointer-events:none; }
+
+    /* ═══════════════════════════════ STREAK COLORS ═══ */
+    .taken-1  { background:hsl(142,50%,87%); color:#1a4a28; border-color:hsl(142,50%,75%); }
+    .taken-2  { background:hsl(142,55%,78%); color:#1a4a28; border-color:hsl(142,55%,65%); }
+    .taken-3  { background:hsl(142,60%,68%); color:#163520; border-color:hsl(142,60%,55%); }
+    .taken-4  { background:hsl(142,65%,57%); color:#0e2818; border-color:hsl(142,65%,45%); }
+    .taken-5  { background:hsl(142,68%,46%); color:#fff;    border-color:hsl(142,68%,36%); }
+    .taken-6  { background:hsl(142,72%,37%); color:#e0fce8; border-color:hsl(142,72%,27%); }
+    .taken-7  { background:hsl(142,76%,29%); color:#c8fadc; border-color:hsl(142,76%,20%); }
+    .taken-8  { background:hsl(142,80%,23%); color:#a7f3c4; border-color:hsl(142,80%,15%); }
+    .taken-9  { background:hsl(142,84%,18%); color:#86efac; border-color:hsl(142,84%,10%); }
+    .taken-10 { background:hsl(142,88%,13%); color:#4ade80; border-color:hsl(142,88%,7%);  }
+
+    /* ═══════════════════════════════ MODAL ═══ */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .modal-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(3px);
+    }
+    .modal-sheet {
+      position: relative; z-index: 1;
+      background: #fff; width: 100%; max-width: 520px;
+      border-radius: 24px 24px 0 0;
+      padding: 12px 20px max(24px, env(safe-area-inset-bottom));
+      max-height: 88vh; overflow-y: auto;
+      animation: slideUp 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .modal-handle {
+      width: 40px; height: 4px; background: #d1edd9;
+      border-radius: 2px; margin: 0 auto 16px;
+    }
+    .modal-sheet h3 {
+      font-size: 1rem; font-weight: 800; color: #15803d;
+      margin-bottom: 18px; text-align: center;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 0.68rem; font-weight: 800;
+      color: #4b7a5a; letter-spacing: 0.1em; text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .form-group input[type="text"] {
+      width: 100%; border: 1.5px solid #d1edd9;
+      border-radius: 12px; padding: 11px 14px;
+      font-size: 0.95rem; color: #1a3a22; background: #f9fefb;
+      outline: none; font-family: inherit;
+    }
+    .form-group input[type="text"]:focus { border-color: #16a34a; }
+
+    /* emoji picker */
+    .emoji-grid {
+      display: grid; grid-template-columns: repeat(8,1fr); gap: 6px;
+    }
+    .emoji-opt {
+      aspect-ratio: 1; border-radius: 10px; border: 2px solid #d1edd9;
+      background: #f9fefb; font-size: 1.3rem;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: border-color 0.12s, background 0.12s;
+    }
+    .emoji-opt.selected { border-color: #16a34a; background: #dcfce7; }
+
+    /* color picker */
+    .color-grid {
+      display: flex; gap: 10px; flex-wrap: wrap;
+    }
+    .color-opt {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer; transition: transform 0.12s, border-color 0.12s;
+    }
+    .color-opt.selected { border-color: #1a3a22; transform: scale(1.18); }
+
+    .modal-actions {
+      display: flex; gap: 10px; margin-top: 20px;
+    }
+    .btn-cancel {
+      flex: 1; border: 1.5px solid #d1edd9; background: #fff;
+      border-radius: 12px; padding: 12px; font-size: 0.9rem;
+      font-weight: 700; color: #4b7a5a; cursor: pointer;
+    }
+    .btn-save {
+      flex: 2; background: #16a34a; border: none;
+      border-radius: 12px; padding: 12px; font-size: 0.9rem;
+      font-weight: 800; color: #fff; cursor: pointer;
+    }
+    .btn-save:active  { background: #15803d; }
+    .btn-delete {
+      width: 100%; margin-top: 10px; border: none;
+      background: none; color: #dc2626;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer;
+      padding: 10px; border-radius: 10px;
+    }
+    .btn-delete:active { background: #fee2e2; }
+    .hidden { display: none !important; }
+
+    /* ─ インラインエラーメッセージ ─ */
+    .field-error {
+      display: none;
+      font-size: 0.75rem; font-weight: 700; color: #dc2626;
+      margin-top: 6px; padding: 6px 10px;
+      background: #fff5f5; border: 1px solid #fecaca;
+      border-radius: 8px; align-items: center; gap: 5px;
+    }
+    .field-error.show { display: flex; animation: errShake 0.3s ease; }
+    @keyframes errShake {
+      0%,100% { transform: translateX(0); }
+      20%      { transform: translateX(-6px); }
+      40%      { transform: translateX(6px); }
+      60%      { transform: translateX(-4px); }
+      80%      { transform: translateX(4px); }
+    }
+    .form-group input[type="text"].has-error {
+      border-color: #dc2626; background: #fff8f8;
+    }
+
+    /* ═══════════ WEEK CELL ─ 時間表示 ═══ */
+    .week-time-info {
+      font-size: clamp(0.55rem, 1.2vw, 0.75rem); font-weight: 700;
+      color: #4b7a5a; background: rgba(255,255,255,0.7);
+      border-radius: 6px; padding: 1px 5px;
+      white-space: nowrap; margin-top: 2px;
+    }
+    [class*="taken-"] .week-time-info { color: rgba(255,255,255,0.9); background: rgba(0,0,0,0.15); }
+
+    /* ═══════════════════════════════ TIME PICKER POPUP ═══ */
+    .tp-popup {
+      position: fixed; z-index: 200;
+      background: #fff; border-radius: 18px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(22,163,74,0.12);
+      border: 1.5px solid #d1edd9;
+      width: 220px;
+      animation: tpFadeIn 0.15s ease;
+    }
+    @keyframes tpFadeIn {
+      from { opacity:0; transform:translateY(6px) scale(0.97); }
+      to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+    .tp-inner { padding: 14px 16px 14px; }
+    .tp-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .tp-title { font-size: 0.95rem; font-weight: 800; color: #15803d; }
+    .tp-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 1.1rem; color: #86b898; line-height: 1;
+      width: 24px; height: 24px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tp-close:active { background: #f0faf4; }
+    .tp-label { font-size: 0.68rem; font-weight: 800; color: #4b7a5a;
+      letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+    .tp-time-input {
+      width: 100%; border: 1.5px solid #d1edd9; border-radius: 10px;
+      padding: 8px 12px; font-size: 1.05rem; font-weight: 700;
+      color: #1a3a22; background: #f9fefb; outline: none;
+      font-family: inherit; margin-bottom: 12px;
+    }
+    .tp-time-input:focus { border-color: #16a34a; }
+    .tp-actions { display: flex; gap: 8px; }
+    .tp-undo-btn {
+      flex: 1; border: 1.5px solid #fecaca; background: #fff;
+      border-radius: 9px; padding: 8px 6px; font-size: 0.75rem;
+      font-weight: 700; color: #dc2626; cursor: pointer;
+    }
+    .tp-undo-btn:active { background: #fee2e2; }
+    .tp-save-btn {
+      flex: 1; background: #16a34a; border: none;
+      border-radius: 9px; padding: 8px 6px; font-size: 0.75rem;
+      font-weight: 800; color: #fff; cursor: pointer;
+    }
+    .tp-save-btn:active { background: #15803d; }
+
+    /* タブ */
+    .tp-tabs { display: flex; gap: 4px; margin-bottom: 12px; background: #f0faf4; border-radius: 10px; padding: 3px; }
+    .tp-tab {
+      flex: 1; border: none; background: none; border-radius: 8px;
+      padding: 5px; font-size: 0.72rem; font-weight: 700; color: #4b7a5a;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .tp-tab.active { background: #fff; color: #16a34a; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    /* 時間範囲 */
+    .tp-range-row { display: flex; align-items: flex-end; gap: 6px; }
+    .tp-range-field { flex: 1; }
+    .tp-range-sep { font-size: 1.2rem; font-weight: 800; color: #86b898; padding-bottom: 8px; flex-shrink: 0; }
+    .tp-popup { width: 260px; } /* rangeモードのため少し広く */
+
+    /* ═══════════════════════════════ CELEBRATION ═══ */
+    .celeb-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      cursor: pointer;
+      animation: celebFadeIn 0.3s ease;
+    }
+    @keyframes celebFadeIn { from{opacity:0} to{opacity:1} }
+    .celeb-content {
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      animation: celebPopUp 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes celebPopUp {
+      from { transform: translateY(60px) scale(0.8); opacity: 0; }
+      to   { transform: translateY(0) scale(1);       opacity: 1; }
+    }
+    .celeb-char { width: clamp(120px,20vw,180px); height: auto; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3)); }
+    .celeb-bubble {
+      background: #fff; border-radius: 20px;
+      padding: 16px 24px; text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      position: relative;
+      max-width: 260px;
+    }
+    .celeb-bubble-tail {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      width: 0; height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-bottom: 14px solid #fff;
+    }
+    .celeb-main { font-size: 1.6rem; font-weight: 900; color: #15803d; margin: 0 0 4px; letter-spacing: 0.04em; }
+    .celeb-sub  { font-size: 0.9rem; font-weight: 700; color: #4b7a5a; margin: 0; }
+    /* confetti */
+    .confetti-piece {
+      position: fixed; top: -10px; border-radius: 3px;
+      pointer-events: none;
+      animation: confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      80%  { opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* ═══════════════════════════════ NOTIFICATION MODAL ═══ */
+    .notif-select, .notif-time-input {
+      width: 100%; border: 1.5px solid #d1edd9;
+      border-radius: 12px; padding: 10px 14px;
+      font-size: 0.9rem; color: #1a3a22; background: #f9fefb;
+      outline: none; font-family: inherit; appearance: none;
+    }
+    .notif-select:focus, .notif-time-input:focus { border-color: #16a34a; }
+    .notif-toggle-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 4px 0;
+    }
+    .notif-toggle-row label {
+      font-size: 0.9rem; font-weight: 700; color: #1a3a22; cursor: pointer;
+      text-transform: none; letter-spacing: 0;
+    }
+    .toggle-switch {
+      position: relative; width: 44px; height: 26px; flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0; background: #d1edd9;
+      border-radius: 13px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: ''; position: absolute;
+      left: 3px; top: 3px; width: 20px; height: 20px;
+      background: #fff; border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    }
+    .toggle-switch input:checked + .toggle-track { background: #16a34a; }
+    .toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); }
+    #notifDetails { transition: opacity 0.2s; }
+    .btn-test-notif {
+      width: 100%; margin-top: 4px; margin-bottom: 4px;
+      background: #f0faf4; border: 1.5px solid #d1edd9;
+      border-radius: 12px; padding: 10px; font-size: 0.85rem;
+      font-weight: 700; color: #16a34a; cursor: pointer;
+    }
+    .btn-test-notif:active { background: #dcfce7; }
+    .notif-note {
+      font-size: 0.7rem; color: #86b898; text-align: center;
+      margin-top: 8px; line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════ HOME ─ EDIT MODE ═══ */
+    #btnSelect {
+      font-size: 0.78rem; font-weight: 800; color: #16a34a;
+      padding: 0 8px; min-width: 48px; border-radius: 10px;
+      border: 1.5px solid #d1edd9; height: 36px;
+      background: #f0faf4; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    #btnSelect:active { background: #dcfce7; }
+    #btnSelect.edit-active {
+      color: #dc2626; border-color: #fecaca; background: #fff5f5;
+    }
+    /* チェックボックス丸 */
+    .edit-checkbox {
+      width: 22px; height: 22px; flex-shrink: 0;
+      border-radius: 50%; border: 2px solid #d1edd9;
+      background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; font-size: 0.75rem; font-weight: 900;
+      color: transparent;
+    }
+    .supp-card.selected-card .edit-checkbox {
+      border-color: #16a34a; background: #16a34a; color: #fff;
+    }
+    .supp-card.selected-card {
+      border-color: #16a34a;
+      box-shadow: 0 0 0 3px #bbf7d0, 0 2px 10px rgba(22,163,74,0.15);
+    }
+    /* 編集モード中はカードのホバー/アクティブを抑制 */
+    .supp-card.edit-mode-card:active { transform: none; }
+    /* 削除バー */
+    .delete-bar {
+      position: sticky; bottom: 0; z-index: 50;
+      background: rgba(244,250,246,0.96);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+      border-top: 1px solid #d1edd9;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+    }
+    .delete-bar-info {
+      flex: 1; font-size: 0.85rem; font-weight: 700; color: #4b7a5a;
+    }
+    .delete-bar-info strong { color: #15803d; }
+    .delete-bar-btn {
+      background: #dc2626; color: #fff; border: none;
+      border-radius: 12px; padding: 10px 22px;
+      font-size: 0.9rem; font-weight: 800; cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .delete-bar-btn:disabled { background: #fca5a5; opacity: 0.7; cursor: not-allowed; }
+    .delete-bar-btn:not(:disabled):active { background: #b91c1c; transform: scale(0.97); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════ VIEW: HOME ═══════════ -->
+<div id="view-home" class="view">
+
+  <header class="app-header">
+    <div class="header-title">
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+        <rect x="4" y="6" width="20" height="20" rx="3" fill="#16a34a" stroke="#15803d" stroke-width="1"/>
+        <rect x="10" y="3" width="8" height="6" rx="2" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+        <path d="M9 14L12 17L19 11" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h1>タスク記録</h1>
+    </div>
+    <button id="btnSelect" aria-label="タスクを選択">選択</button>
+    <button class="icon-btn" id="btnAdd" aria-label="タスクを追加">＋</button>
+  </header>
+
+  <div id="todaySummary" class="today-bar"></div>
+  <div id="suppList" class="supp-list"></div>
+  <div id="emptyState" class="empty-state hidden">
+    <div class="empty-icon">✅</div>
+    <p>タスクを追加してください</p>
+    <button class="btn-start" id="btnEmptyAdd">＋ 追加する</button>
+  </div>
+
+</div>
+
+<!-- ═══════════ VIEW: DETAIL ═══════════ -->
+<div id="view-detail" class="view">
+
+  <header class="app-header">
+    <button class="back-btn" id="btnBack">
+      <svg width="8" height="13" viewBox="0 0 8 13" fill="none">
+        <path d="M7 1L1 6.5L7 12" stroke="#16a34a" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      ホーム
+    </button>
+    <div class="header-title" style="justify-content:center">
+      <span class="header-emoji" id="detailEmoji"></span>
+      <h2 id="detailName"></h2>
+    </div>
+    <button class="icon-btn" id="btnNotif" aria-label="通知設定" style="font-size:1.2rem">
+      <span id="notifBellIcon">🔕</span>
+    </button>
+    <button class="icon-btn" id="btnEditSupp" aria-label="編集">
+      <svg width="18" height="4" viewBox="0 0 18 4" fill="none">
+        <circle cx="2" cy="2" r="2" fill="#16a34a"/>
+        <circle cx="9" cy="2" r="2" fill="#16a34a"/>
+        <circle cx="16" cy="2" r="2" fill="#16a34a"/>
+      </svg>
+    </button>
+  </header>
+
+  <div class="detail-layout">
+
+    <!-- 左上: メモ -->
+    <div class="memo-section">
+      <div class="section-label">メモ</div>
+      <textarea id="detailMemo" class="memo-textarea" placeholder="このタスクについてメモを残せます..."></textarea>
+    </div>
+
+    <!-- 中央: 週間ビュー -->
+    <div class="week-section">
+      <div class="section-label">今週</div>
+      <div class="week-grid" id="weekGrid"></div>
+    </div>
+
+    <!-- 右: 統計カード -->
+    <div class="detail-stats">
+      <div class="stat-card" id="streakCard">
+        <span class="sc-icon" id="scIcon">🌿</span>
+        <span class="sc-num" id="scNum">0</span>
+        <span class="sc-unit">継続日数</span>
+      </div>
+      <div class="stat-card" id="totalCard">
+        <span class="sc-icon">✅</span>
+        <span class="sc-num" id="scTotal">0</span>
+        <span class="sc-unit">合計日数</span>
+      </div>
+    </div>
+
+    <!-- 左下: 月間カレンダー -->
+    <div class="month-section">
+      <div class="section-label">月間</div>
+      <div class="month-nav">
+        <button id="prevMonth">&#8249;</button>
+        <span class="month-title" id="monthTitle"></span>
+        <button id="nextMonth">&#8250;</button>
+      </div>
+      <div class="month-dow-row" id="monthDowRow"></div>
+      <div class="month-grid" id="monthGrid"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ═══════════ MODAL ═══════════ -->
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h3 id="modalTitle">タスクを追加</h3>
+
+    <div class="form-group">
+      <label>名前</label>
+      <input type="text" id="inputName" placeholder="例：朝のランニング" maxlength="20">
+      <div class="field-error" id="inputNameError">
+        <span>⚠</span><span>タスク名を入力してください</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>絵文字</label>
+      <div id="emojiPicker" class="emoji-grid"></div>
+    </div>
+    <div class="form-group">
+      <label>カラー</label>
+      <div id="colorPicker" class="color-grid"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btnModalCancel">キャンセル</button>
+      <button class="btn-save"   id="btnModalSave">追加</button>
+    </div>
+    <button class="btn-delete hidden" id="btnModalDelete">このタスクを削除する</button>
+  </div>
+</div>
+
+<!-- ═══════════ TIME PICKER POPUP ═══════════ -->
+<div id="timePicker" class="tp-popup hidden">
+  <div class="tp-inner">
+    <div class="tp-header">
+      <span class="tp-title" id="tpTitle"></span>
+      <button class="tp-close" id="tpClose">×</button>
+    </div>
+    <!-- モード切替タブ -->
+    <div class="tp-tabs" id="tpTabs">
+      <button class="tp-tab active" data-mode="time">完了時刻</button>
+      <button class="tp-tab"        data-mode="range">開始〜終了</button>
+    </div>
+    <!-- 完了時刻モード -->
+    <div id="tpModeTime">
+      <label class="tp-label">完了時刻（任意）</label>
+      <input type="time" id="tpTime" class="tp-time-input">
+    </div>
+    <!-- 開始〜終了モード -->
+    <div id="tpModeRange" class="hidden">
+      <div class="tp-range-row">
+        <div class="tp-range-field">
+          <label class="tp-label">開始</label>
+          <input type="time" id="tpStart" class="tp-time-input">
+        </div>
+        <span class="tp-range-sep">〜</span>
+        <div class="tp-range-field">
+          <label class="tp-label">終了</label>
+          <input type="time" id="tpEnd" class="tp-time-input">
+        </div>
+      </div>
+    </div>
+    <div class="tp-actions">
+      <button class="tp-undo-btn" id="tpToggle">完了を取り消す</button>
+      <button class="tp-save-btn" id="tpSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 演出オーバーレイはJSで動的生成 -->
+
+<!-- ═══════════ NOTIFICATION MODAL ═══════════ -->
+<div id="notifModal" class="modal-overlay hidden">
+  <div class="modal-backdrop" id="notifBackdrop"></div>
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h3>🔔 通知設定</h3>
+
+    <div class="form-group">
+      <div class="notif-toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="notifEnabled">
+          <span class="toggle-track"></span>
+        </label>
+        <label for="notifEnabled">通知を有効にする</label>
+      </div>
+    </div>
+
+    <div id="notifDetails">
+      <div class="form-group">
+        <label>通知タイミング</label>
+        <select id="notifFreq" class="notif-select">
+          <option value="daily">毎日</option>
+          <option value="2days">2日ごと</option>
+          <option value="3days">3日ごと</option>
+          <option value="weekly">毎週</option>
+          <option value="monthly">毎月</option>
+          <option value="always">毎回（アプリ起動時）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>通知時刻</label>
+        <input type="time" id="notifTime" value="09:00" class="notif-time-input">
+      </div>
+      <div class="form-group">
+        <label>通知メッセージ</label>
+        <input type="text" id="notifMessage" placeholder="タスクは完了しましたか？" maxlength="60">
+      </div>
+      <button id="btnTestNotif" class="btn-test-notif">📣 テスト通知を送る</button>
+      <p class="notif-note">※ 通知はアプリを開いているときに機能します。<br>確実な通知にはホーム画面に追加（PWAインストール）を推奨します。</p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btnNotifCancel">キャンセル</button>
+      <button class="btn-save" id="btnNotifSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const STORAGE_KEY = 'task_app_v1';
+const DAY_NAMES   = ['日','月','火','水','木','金','土'];
+const today       = new Date(); today.setHours(0,0,0,0);
+
+const EMOJIS = ['✅','📌','🎯','💪','⭐','🏃','📚','💡','🎨','🔥','🧘','🍎','🌅','📝','🏆','🎸'];
+const COLORS = ['#16a34a','#2563eb','#7c3aed','#ea580c','#db2777','#0d9488','#dc2626','#d97706'];
+
+const SVG_NOT_TAKEN = `<svg viewBox="0 0 32 32" fill="none">
+  <rect x="7" y="5" width="18" height="22" rx="3" fill="#f0faf4" stroke="#b0ccb8" stroke-width="1.5"/>
+  <rect x="11" y="3" width="10" height="5" rx="2.5" fill="#d1edd9" stroke="#86b898" stroke-width="1.2"/>
+  <line x1="11" y1="14" x2="21" y2="14" stroke="#c0dcc8" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="11" y1="18.5" x2="19" y2="18.5" stroke="#c0dcc8" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="11" y1="23" x2="17" y2="23" stroke="#c0dcc8" stroke-width="1.8" stroke-linecap="round"/>
+</svg>`;
+
+const SVG_TAKEN = `<svg viewBox="0 0 32 32" fill="none">
+  <rect x="7" y="5" width="18" height="22" rx="3" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <rect x="11" y="3" width="10" height="5" rx="2.5" fill="#86efac" stroke="#16a34a" stroke-width="1.2"/>
+  <path d="M11 16.5L14.5 20L21 13" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let activeSuppId  = null;
+let viewMonth     = { y: today.getFullYear(), m: today.getMonth() };
+let modalMode     = null;   // 'add' | 'edit'
+let selEmoji      = EMOJIS[0];
+let selColor      = COLORS[0];
+
+// ホーム編集モード
+let editMode      = false;
+let selectedIds   = new Set();
+
+// ═══════════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════════
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { supplements:[], logs:{} }; }
+  catch { return { supplements:[], logs:{} }; }
+}
+function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+function dateKey(date) {
+  const d = new Date(date); d.setHours(0,0,0,0);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+const todayKey = dateKey(today);
+
+// ─── Streak & Totals ───
+// ─── ログ値ヘルパー ───
+// logs[dk]: undefined=未完了, true=完了(時刻なし), "HH:MM"=完了時刻, "HH:MM~HH:MM"=開始〜終了
+function isDone(val) { return !!val; }
+
+function getTimeInfo(val) {
+  if (!val || val === true) return null;
+  if (typeof val !== 'string') return null;
+  const range = val.match(/^(\d{2}:\d{2})~(\d{2}:\d{2})$/);
+  if (range) return { type: 'range', start: range[1], end: range[2] };
+  if (/^\d{2}:\d{2}$/.test(val)) return { type: 'time', time: val };
+  return null;
+}
+// 後方互換: 以前の getTime() 呼び出し用
+function getTime(val) {
+  const info = getTimeInfo(val);
+  if (!info) return null;
+  if (info.type === 'time') return info.time;
+  if (info.type === 'range') return info.end; // 終了時刻を返す
+  return null;
+}
+function getTimeDisplay(val) {
+  const info = getTimeInfo(val);
+  if (!info) return null;
+  if (info.type === 'time') return info.time;
+  if (info.type === 'range') return `${info.start}〜${info.end}`;
+  return null;
+}
+
+function getStreak(logs, dk) {
+  if (!isDone(logs[dk])) return 0;
+  let s = 1, d = new Date(dk);
+  while(true) {
+    d.setDate(d.getDate()-1);
+    if (!isDone(logs[dateKey(d)])) break;
+    s++;
+  }
+  return s;
+}
+function getCurrentStreak(logs) {
+  let s = getStreak(logs, todayKey);
+  if (s === 0) {
+    const yest = new Date(today); yest.setDate(yest.getDate()-1);
+    s = getStreak(logs, dateKey(yest));
+  }
+  return s;
+}
+function getTotal(logs) { return Object.keys(logs).filter(k => isDone(logs[k])).length; }
+function streakClass(s) { return s > 0 ? 'taken-'+Math.min(s,10) : ''; }
+
+// ═══════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function goDetail(suppId) {
+  // 編集モードを終了してから遷移
+  if (editMode) { editMode = false; selectedIds.clear(); }
+  activeSuppId = suppId;
+  viewMonth = { y: today.getFullYear(), m: today.getMonth() };
+  renderDetail();
+  document.getElementById('view-home').classList.add('pushed');
+  document.getElementById('view-detail').classList.add('active');
+  document.getElementById('view-detail').scrollTop = 0;
+}
+function goHome() {
+  document.getElementById('view-home').classList.remove('pushed');
+  document.getElementById('view-detail').classList.remove('active');
+  renderHome();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════════════════
+function buildPickers() {
+  const eg = document.getElementById('emojiPicker');
+  eg.innerHTML = '';
+  EMOJIS.forEach(e => {
+    const el = document.createElement('div');
+    el.className = 'emoji-opt' + (e === selEmoji ? ' selected' : '');
+    el.textContent = e;
+    el.onclick = () => {
+      selEmoji = e;
+      eg.querySelectorAll('.emoji-opt').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+    eg.appendChild(el);
+  });
+
+  const cg = document.getElementById('colorPicker');
+  cg.innerHTML = '';
+  COLORS.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'color-opt' + (c === selColor ? ' selected' : '');
+    el.style.background = c;
+    el.onclick = () => {
+      selColor = c;
+      cg.querySelectorAll('.color-opt').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+    cg.appendChild(el);
+  });
+}
+
+function openModal(mode, suppId = null) {
+  modalMode = mode;
+  const data = loadData();
+
+  // エラー表示をリセット
+  _clearNameError();
+
+  if (mode === 'add') {
+    selEmoji = EMOJIS[0]; selColor = COLORS[0];
+    document.getElementById('modalTitle').textContent = 'タスクを追加';
+    document.getElementById('inputName').value = '';
+    document.getElementById('btnModalDelete').classList.add('hidden');
+    document.getElementById('btnModalSave').textContent = '追加';
+  } else {
+    const s = data.supplements.find(x => x.id === suppId);
+    if (!s) return;
+    activeSuppId = suppId;
+    selEmoji = s.emoji; selColor = s.color;
+    document.getElementById('modalTitle').textContent = 'タスクを編集';
+    document.getElementById('inputName').value = s.name;
+    document.getElementById('btnModalDelete').classList.remove('hidden');
+    document.getElementById('btnModalSave').textContent = '保存';
+  }
+  buildPickers();
+  document.getElementById('modalOverlay').classList.remove('hidden');
+  document.getElementById('inputName').focus();
+}
+
+// ─ フォームエラーヘルパー ─
+function _showNameError(msg) {
+  const inp = document.getElementById('inputName');
+  const err = document.getElementById('inputNameError');
+  inp.classList.add('has-error');
+  err.querySelector('span:last-child').textContent = msg;
+  // アニメーション再トリガー
+  err.classList.remove('show');
+  requestAnimationFrame(() => err.classList.add('show'));
+  inp.focus();
+}
+function _clearNameError() {
+  document.getElementById('inputName').classList.remove('has-error');
+  document.getElementById('inputNameError').classList.remove('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.add('hidden');
+  _clearNameError();
+}
+
+function saveModal() {
+  const name = document.getElementById('inputName').value.trim();
+  if (!name) {
+    _showNameError('タスク名を入力してください');
+    return;
+  }
+  _clearNameError();
+  const data = loadData();
+  if (modalMode === 'add') {
+    const s = { id: uid(), name, emoji: selEmoji, color: selColor, createdAt: new Date().toISOString() };
+    data.supplements.push(s);
+    data.logs[s.id] = {};
+  } else {
+    const s = data.supplements.find(x => x.id === activeSuppId);
+    if (s) { s.name = name; s.emoji = selEmoji; s.color = selColor; }
+  }
+  saveData(data);
+  closeModal();
+  if (modalMode === 'edit') renderDetail();
+  renderHome();
+}
+
+function deleteSupp() {
+  if (!confirm('このタスクを削除しますか？\n記録もすべて削除されます。')) return;
+  const data = loadData();
+  data.supplements = data.supplements.filter(x => x.id !== activeSuppId);
+  delete data.logs[activeSuppId];
+  saveData(data);
+  closeModal();
+  goHome();
+}
+
+// ─── ホーム編集モード ───
+function toggleEditMode() {
+  editMode = !editMode;
+  if (!editMode) selectedIds.clear();
+  renderHome();
+}
+
+function toggleCardSelect(id) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+  } else {
+    selectedIds.add(id);
+  }
+  renderHome();
+}
+
+function deleteSelected() {
+  if (selectedIds.size === 0) return;
+  const count = selectedIds.size;
+  if (!confirm(`選択した ${count} 件のタスクを削除しますか？\n記録もすべて削除されます。`)) return;
+  const data = loadData();
+  selectedIds.forEach(id => {
+    data.supplements = data.supplements.filter(x => x.id !== id);
+    delete data.logs[id];
+    if (data.memos)         delete data.memos[id];
+    if (data.notifications) delete data.notifications[id];
+  });
+  saveData(data);
+  selectedIds.clear();
+  editMode = false;
+  renderHome();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER: HOME
+// ═══════════════════════════════════════════════════════════
+function renderHome() {
+  const data   = loadData();
+  const supps  = data.supplements;
+  const list   = document.getElementById('suppList');
+  const empty  = document.getElementById('emptyState');
+  const todayBar = document.getElementById('todaySummary');
+
+  // ─ 選択ボタンの状態 ─
+  const btnSel = document.getElementById('btnSelect');
+  btnSel.textContent = editMode ? '完了' : '選択';
+  btnSel.classList.toggle('edit-active', editMode);
+
+  // today summary
+  const takenToday = supps.filter(s => data.logs[s.id]?.[todayKey]).length;
+  todayBar.innerHTML = `
+    <div class="tb-left">今日 <strong>${takenToday} / ${supps.length}</strong> 完了済み</div>
+    <div class="tb-pips">
+      ${supps.map(s => {
+        const taken = data.logs[s.id]?.[todayKey];
+        return `<div class="tb-pip ${taken ? 'done' : ''}" style="color:${s.color}"></div>`;
+      }).join('')}
+    </div>`;
+
+  if (supps.length === 0) {
+    list.innerHTML  = '';
+    empty.classList.remove('hidden');
+    _removeDeleteBar();
+    editMode = false;
+    return;
+  }
+  empty.classList.add('hidden');
+
+  // get current week (Mon → Sun)
+  const dow    = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((dow+6)%7));
+  const weekDays = Array.from({length:7}, (_,i) => {
+    const d = new Date(monday); d.setDate(monday.getDate()+i); return d;
+  });
+
+  list.innerHTML = '';
+  supps.forEach(s => {
+    const logs  = data.logs[s.id] || {};
+    const taken = !!logs[todayKey];
+    const streak = getCurrentStreak(logs);
+    const total  = getTotal(logs);
+
+    // mini week ─ 完了済み: チェックアイコン / 未完了: クリップボード
+    const miniDots = weekDays.map(d => {
+      const dk       = dateKey(d);
+      const isFuture = d > today;
+      const isToday  = dk === todayKey;
+      const dayTaken = !!logs[dk];
+      const label    = DAY_NAMES[d.getDay()];
+      const classes  = [
+        'mini-cell',
+        dayTaken  ? 'taken-cell'  : '',
+        isToday   ? 'today-ring'  : '',
+        isFuture  ? 'future'      : '',
+      ].filter(Boolean).join(' ');
+      const icon = dayTaken ? SVG_TAKEN : SVG_NOT_TAKEN;
+      return `<div class="mini-day">
+        <span class="mini-label">${label}</span>
+        <div class="${classes}">${icon}</div>
+      </div>`;
+    }).join('');
+
+    const badgeClass = streak >= 7 ? 'hot' : '';
+    const badgeText  = streak >= 7 ? `🔥 ${streak}連` : streak >= 2 ? `✨ ${streak}連` : streak === 1 ? '🌿 1連' : '—';
+
+    const isSelected = editMode && selectedIds.has(s.id);
+    const card = document.createElement('div');
+    card.className = ['supp-card', isSelected ? 'selected-card' : '', editMode ? 'edit-mode-card' : '']
+      .filter(Boolean).join(' ');
+
+    // チェックボックス（編集モード時のみ）
+    const checkboxHTML = editMode
+      ? `<div class="edit-checkbox">${isSelected ? '✓' : ''}</div>` : '';
+
+    card.innerHTML = `
+      <div class="card-accent" style="background:${s.color}"></div>
+      <div class="card-body">
+        <div class="card-top">
+          ${checkboxHTML}
+          <span class="card-emoji">${s.emoji}</span>
+          <span class="card-name">${s.name}</span>
+          <span class="card-streak-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="card-week">${miniDots}</div>
+        <div class="card-bottom">
+          <span class="card-total">累計 ${total} 日</span>
+          ${editMode ? '' : `<button class="take-btn ${taken?'taken':'not-taken'}" data-id="${s.id}">
+            ${taken ? '✓ 完了済み' : '完了する'}
+          </button>`}
+        </div>
+      </div>`;
+
+    if (editMode) {
+      // タップで選択トグル
+      card.addEventListener('click', () => toggleCardSelect(s.id));
+    } else {
+      // take button tap
+      card.querySelector('.take-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        toggleDay(s.id, todayKey);
+      });
+      // card body tap → detail
+      card.addEventListener('click', () => goDetail(s.id));
+    }
+    list.appendChild(card);
+  });
+
+  // ─ 削除バー ─
+  if (editMode) {
+    _renderDeleteBar();
+  } else {
+    _removeDeleteBar();
+  }
+}
+
+function _renderDeleteBar() {
+  let bar = document.getElementById('deleteBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'deleteBar';
+    bar.className = 'delete-bar';
+    document.getElementById('view-home').appendChild(bar);
+  }
+  const cnt = selectedIds.size;
+  bar.innerHTML = `
+    <div class="delete-bar-info">
+      ${cnt > 0
+        ? `<strong>${cnt}件</strong>選択中`
+        : 'タスクを選択してください'}
+    </div>
+    <button class="delete-bar-btn" id="btnDeleteSelected" ${cnt === 0 ? 'disabled' : ''}>
+      削除する
+    </button>`;
+  bar.querySelector('#btnDeleteSelected').addEventListener('click', deleteSelected);
+}
+
+function _removeDeleteBar() {
+  document.getElementById('deleteBar')?.remove();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER: DETAIL
+// ═══════════════════════════════════════════════════════════
+function renderDetail() {
+  const data = loadData();
+  const s    = data.supplements.find(x => x.id === activeSuppId);
+  if (!s) return;
+  const logs = data.logs[s.id] || {};
+
+  document.getElementById('detailEmoji').textContent = s.emoji;
+  document.getElementById('detailName').textContent  = s.name;
+
+  // stats
+  const streak = getCurrentStreak(logs);
+  const total  = getTotal(logs);
+  document.getElementById('scNum').textContent   = streak;
+  document.getElementById('scTotal').textContent = total;
+  const card = document.getElementById('streakCard');
+  const icon = document.getElementById('scIcon');
+  if (streak >= 7) { card.classList.add('hot'); icon.textContent='🔥'; }
+  else if (streak >= 3) { card.classList.remove('hot'); icon.textContent='✨'; }
+  else { card.classList.remove('hot'); icon.textContent='🌿'; }
+
+  renderWeek(logs);
+  renderMonth(logs);
+  renderMemo(activeSuppId);
+  updateNotifBell();
+}
+
+function toggleDay(suppId, dk) {
+  if (dk > todayKey) return;
+  const data = loadData();
+  if (!data.logs[suppId]) data.logs[suppId] = {};
+  const wasDone = isDone(data.logs[suppId][dk]);
+  if (wasDone) {
+    delete data.logs[suppId][dk];
+  } else {
+    data.logs[suppId][dk] = true;
+    showCelebration(); // 完了した瞬間に必ず演出
+  }
+  saveData(data);
+  if (document.getElementById('view-detail').classList.contains('active')) renderDetail();
+  renderHome();
+}
+
+// ─── Week Grid ───
+function renderWeek(logs) {
+  const grid = document.getElementById('weekGrid');
+  grid.innerHTML = '';
+  const dow    = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((dow+6)%7));
+
+  for (let i = 0; i < 7; i++) {
+    const d  = new Date(monday); d.setDate(monday.getDate()+i);
+    const dk = dateKey(d);
+    const isFuture = d > today;
+    const isToday  = dk === todayKey;
+    const streak   = getStreak(logs, dk);
+    const logVal   = logs[dk];
+    const taken    = isDone(logVal);
+    const timeDisp = getTimeDisplay(logVal);
+
+    const cell = document.createElement('div');
+    cell.className = ['week-cell', isToday?'today':'', isFuture?'future':'', streakClass(streak)]
+      .filter(Boolean).join(' ');
+
+    const badge = streak >= 2
+      ? `<span class="streak-badge">${streak>=7?'🔥'+streak:streak+'連'}</span>` : '';
+
+    // 時刻表示（あれば）
+    const timeHTML = timeDisp
+      ? `<span class="week-time-info">${timeDisp}</span>` : '';
+
+    cell.innerHTML = `${badge}
+      <span class="day-name">${DAY_NAMES[d.getDay()]}</span>
+      <span class="day-num">${d.getDate()}</span>
+      <span class="pill-wrap">${taken ? SVG_TAKEN : SVG_NOT_TAKEN}</span>
+      ${timeHTML}`;
+
+    // クリックで時刻ピッカーを開く（未来は不可）
+    if (!isFuture) {
+      cell.addEventListener('click', e => {
+        e.stopPropagation();
+        openTimePicker(activeSuppId, dk, cell);
+      });
+    }
+    grid.appendChild(cell);
+  }
+}
+
+// ─── Month Grid ───
+function renderMonth(logs) {
+  const { y, m } = viewMonth;
+  document.getElementById('monthTitle').textContent = `${y}年 ${m+1}月`;
+
+  // 曜日ヘッダーは専用 div に（グリッドとは別）
+  const dowRow = document.getElementById('monthDowRow');
+  if (dowRow) dowRow.innerHTML = DAY_NAMES.map(n => `<span>${n}</span>`).join('');
+
+  // グリッドには空セル＋日付セルのみ
+  const grid = document.getElementById('monthGrid');
+  grid.innerHTML = '';
+
+  const lastDay  = new Date(y, m+1, 0).getDate();
+  const startDow = new Date(y, m, 1).getDay();
+
+  // 行数を明示的に設定（Safari の grid-auto-rows: 1fr バグ回避）
+  const numRows = Math.ceil((startDow + lastDay) / 7);
+  grid.style.gridTemplateRows = `repeat(${numRows}, minmax(0, 1fr))`;
+
+  for (let i = 0; i < startDow; i++) {
+    const e = document.createElement('div'); e.className = 'month-cell empty';
+    grid.appendChild(e);
+  }
+  for (let day = 1; day <= lastDay; day++) {
+    const d  = new Date(y, m, day);
+    const dk = dateKey(d);
+    const isFuture = d > today;
+    const isToday  = dk === todayKey;
+    const logVal   = logs[dk];
+    const streak   = getStreak(logs, dk);
+    const timeStr  = getTime(logVal);
+
+    const cell = document.createElement('div');
+    cell.className = ['month-cell', isToday?'today':'', isFuture?'future':'', streakClass(streak)]
+      .filter(Boolean).join(' ');
+
+    // 日付番号 + 時刻（あれば小さく表示）
+    const daySpan = document.createElement('span');
+    daySpan.className = 'cell-day';
+    daySpan.textContent = day;
+    cell.appendChild(daySpan);
+
+    const dispStr = getTimeDisplay(logVal);
+    if (dispStr) {
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'cell-time';
+      // 月セルは小さいので開始〜終了は短縮表示
+      const info = getTimeInfo(logVal);
+      timeSpan.textContent = info?.type === 'range'
+        ? `${info.start.slice(0,5)}〜${info.end.slice(0,5)}`
+        : dispStr;
+      cell.appendChild(timeSpan);
+      cell.title = info?.type === 'range'
+        ? `${info.start}〜${info.end}`
+        : `完了時刻: ${dispStr}`;
+    }
+
+    // クリックで時刻ピッカーを開く
+    if (!isFuture) {
+      cell.addEventListener('click', e => { e.stopPropagation(); openTimePicker(activeSuppId, dk, cell); });
+    }
+    grid.appendChild(cell);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TIME PICKER
+// ═══════════════════════════════════════════════════════════
+let tpSuppId = null, tpDateKey = null;
+let tpMode = 'time'; // 'time' | 'range'
+
+function openTimePicker(suppId, dk, cellEl) {
+  tpSuppId = suppId;
+  tpDateKey = dk;
+
+  const data    = loadData();
+  const logVal  = data.logs[suppId]?.[dk];
+  const done    = isDone(logVal);
+  const info    = getTimeInfo(logVal);
+
+  // タイトル
+  const d = new Date(dk + 'T00:00:00');
+  document.getElementById('tpTitle').textContent =
+    `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
+
+  // モード初期化（既存データに合わせて）
+  tpMode = (info?.type === 'range') ? 'range' : 'time';
+  switchTpMode(tpMode);
+
+  // 値設定
+  if (info?.type === 'range') {
+    document.getElementById('tpStart').value = info.start || '';
+    document.getElementById('tpEnd').value   = info.end   || '';
+    document.getElementById('tpTime').value  = '';
+  } else {
+    document.getElementById('tpTime').value  = info?.time || '';
+    document.getElementById('tpStart').value = '';
+    document.getElementById('tpEnd').value   = '';
+  }
+
+  // 完了ボタン
+  const btn = document.getElementById('tpToggle');
+  btn.textContent     = done ? '完了を取り消す' : '完了にする';
+  btn.style.color     = done ? '#dc2626' : '#16a34a';
+  btn.style.borderColor = done ? '#fecaca' : '#bbf7d0';
+  btn.dataset.done    = done ? 'true' : 'false';
+
+  // 表示位置
+  const popup = document.getElementById('timePicker');
+  popup.classList.remove('hidden');
+  const rect = cellEl.getBoundingClientRect();
+  const pw = 268, ph = 200;
+  let left = rect.left + rect.width / 2 - pw / 2;
+  let top  = rect.bottom + 8;
+  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+  if (left < 8) left = 8;
+  if (top + ph > window.innerHeight - 8) top = rect.top - ph - 8;
+  if (top < 8) top = 8;
+  popup.style.left = left + 'px';
+  popup.style.top  = top  + 'px';
+}
+
+function switchTpMode(mode) {
+  tpMode = mode;
+  document.getElementById('tpModeTime').classList.toggle('hidden',  mode !== 'time');
+  document.getElementById('tpModeRange').classList.toggle('hidden', mode !== 'range');
+  document.querySelectorAll('.tp-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.mode === mode);
+  });
+}
+
+function closeTimePicker() {
+  document.getElementById('timePicker').classList.add('hidden');
+  tpSuppId = null; tpDateKey = null;
+}
+
+function saveTimePicker() {
+  if (!tpSuppId || !tpDateKey) return;
+  const data = loadData();
+  if (!data.logs[tpSuppId]) data.logs[tpSuppId] = {};
+
+  const wasDone = isDone(data.logs[tpSuppId][tpDateKey]);
+  let newVal;
+  if (tpMode === 'range') {
+    const s = document.getElementById('tpStart').value;
+    const e = document.getElementById('tpEnd').value;
+    newVal = (s && e) ? `${s}~${e}` : true;
+  } else {
+    const t = document.getElementById('tpTime').value;
+    newVal = t || true;
+  }
+  data.logs[tpSuppId][tpDateKey] = newVal;
+  saveData(data);
+
+  if (!wasDone) showCelebration(); // 完了した瞬間に必ず演出
+
+  closeTimePicker();
+  renderDetail(); renderHome();
+}
+
+function toggleDoneInPicker() {
+  if (!tpSuppId || !tpDateKey) return;
+  const data = loadData();
+  if (!data.logs[tpSuppId]) data.logs[tpSuppId] = {};
+  const wasDone = document.getElementById('tpToggle').dataset.done === 'true';
+  if (wasDone) {
+    delete data.logs[tpSuppId][tpDateKey];
+  } else {
+    // 未完了→完了
+    if (tpMode === 'range') {
+      const s = document.getElementById('tpStart').value;
+      const e = document.getElementById('tpEnd').value;
+      data.logs[tpSuppId][tpDateKey] = (s && e) ? `${s}~${e}` : true;
+    } else {
+      data.logs[tpSuppId][tpDateKey] = document.getElementById('tpTime').value || true;
+    }
+    showCelebration(); // 完了した瞬間に必ず演出
+  }
+  saveData(data);
+  closeTimePicker();
+  renderDetail(); renderHome();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CELEBRATION ANIMATION（完全動的生成）
+// ═══════════════════════════════════════════════════════════
+let celebTimer = null;
+
+const CHAR_SVG = `<svg viewBox="0 0 140 210" xmlns="http://www.w3.org/2000/svg" style="width:clamp(150px,26vw,230px);height:auto;filter:drop-shadow(0 12px 36px rgba(0,0,0,0.38))">
+
+  <!-- ══ 首 ══ -->
+  <rect x="60" y="100" width="20" height="16" rx="5" fill="#f0b468"/>
+
+  <!-- ══ デニムシャツ本体 ══ -->
+  <path d="M12 116 L44 108 L70 114 L96 108 L128 116 L132 210 L8 210Z" fill="#2d5fa8"/>
+  <path d="M12 116 L44 108 L46 210 L8 210Z" fill="#2256a0" opacity="0.45"/>
+  <path d="M96 108 L128 116 L132 210 L94 210Z" fill="#2256a0" opacity="0.45"/>
+  <!-- ステッチライン -->
+  <line x1="70" y1="116" x2="70" y2="208" stroke="#1a4a96" stroke-width="1.2" stroke-dasharray="4,7"/>
+  <!-- ボタン -->
+  <circle cx="70" cy="130" r="3.5" fill="#16378a"/><circle cx="70" cy="145" r="3.5" fill="#16378a"/>
+  <circle cx="70" cy="160" r="3.5" fill="#16378a"/><circle cx="70" cy="175" r="3.5" fill="#16378a"/>
+  <!-- 胸ポケット -->
+  <rect x="83" y="120" width="22" height="18" rx="3" fill="none" stroke="#4a7ac8" stroke-width="1.4"/>
+  <line x1="94" y1="120" x2="94" y2="138" stroke="#4a7ac8" stroke-width="0.8"/>
+  <!-- ボタンポケット -->
+  <circle cx="87" cy="122" r="1.6" fill="#16378a"/>
+  <!-- 襟 -->
+  <path d="M70 114 L54 128 L70 123 L86 128 L70 114" fill="#264e8c"/>
+  <path d="M70 114 L56 124" stroke="#3b6bab" stroke-width="0.8" fill="none"/>
+  <path d="M70 114 L84 124" stroke="#3b6bab" stroke-width="0.8" fill="none"/>
+
+  <!-- ══ 腕（袖まくり） ══ -->
+  <path d="M12 116 Q-2 132 3 156 Q12 163 20 154 L30 118Z" fill="#2d5fa8"/>
+  <path d="M128 116 Q142 132 137 156 Q128 163 120 154 L110 118Z" fill="#2d5fa8"/>
+  <!-- 袖まくりの折り返し -->
+  <path d="M3 156 Q12 163 20 154 Q10 158 3 156Z" fill="#4a7ac8"/>
+  <path d="M137 156 Q128 163 120 154 Q130 158 137 156Z" fill="#4a7ac8"/>
+
+  <!-- ══ 顔ベース ══ -->
+  <ellipse cx="70" cy="74" rx="34" ry="36" fill="#f2b870"/>
+  <!-- 顔の陰影 -->
+  <ellipse cx="70" cy="86" rx="26" ry="18" fill="#e8a050" opacity="0.18"/>
+  <!-- 顔ハイライト -->
+  <ellipse cx="63" cy="62" rx="14" ry="10" fill="#ffd090" opacity="0.4"/>
+
+  <!-- ══ 耳 ══ -->
+  <ellipse cx="36" cy="78" rx="6" ry="8" fill="#edaa60"/>
+  <ellipse cx="104" cy="78" rx="6" ry="8" fill="#edaa60"/>
+  <path d="M37 73 Q33 78 37 83" stroke="#d4904a" stroke-width="1.2" fill="none"/>
+  <path d="M103 73 Q107 78 103 83" stroke="#d4904a" stroke-width="1.2" fill="none"/>
+
+  <!-- ══ 髪（ブラック、自然なウェーブ） ══ -->
+  <!-- 後頭部の髪 -->
+  <path d="M36 62 Q36 36 70 33 Q104 36 104 62 Q100 44 70 42 Q40 44 36 62Z" fill="#150e05"/>
+  <!-- 前髪ウェーブ -->
+  <path d="M36 58 Q42 46 54 44 Q62 42 70 43 Q78 42 86 44 Q98 46 104 58 Q96 50 70 49 Q44 50 36 58Z" fill="#0e0803"/>
+  <!-- 前髪のサイド流れ -->
+  <path d="M38 56 Q36 64 37 72" stroke="#150e05" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M102 56 Q104 64 103 72" stroke="#150e05" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- 前髪ハイライト -->
+  <path d="M52 43 Q64 40 74 42 Q65 39 52 43Z" fill="#2a1a08" opacity="0.7"/>
+
+  <!-- ══ ヘルメット ══ -->
+  <!-- ヘルメット影/ブリム下 -->
+  <ellipse cx="70" cy="50" rx="46" ry="9" fill="#c07a00" opacity="0.5"/>
+  <!-- ヘルメットドーム -->
+  <path d="M26 50 Q24 20 70 17 Q116 20 114 50Z" fill="#f59e0b"/>
+  <!-- ヘルメットハイライト -->
+  <ellipse cx="58" cy="28" rx="18" ry="8" fill="#fde68a" opacity="0.65"/>
+  <ellipse cx="52" cy="25" rx="8" ry="4" fill="#fff" opacity="0.25"/>
+  <!-- ヘルメットブリム -->
+  <ellipse cx="70" cy="50" rx="44" ry="8" fill="#fbbf24"/>
+  <!-- ヘルメットバンド -->
+  <rect x="26" y="46" width="88" height="7" rx="3.5" fill="#d97706"/>
+  <!-- ヘルメット中央ライン -->
+  <path d="M70 18 Q72 34 70 50" stroke="#e08a00" stroke-width="1" fill="none" opacity="0.4"/>
+
+  <!-- ══ 眉毛 ══ -->
+  <path d="M46 64 Q55 60 64 62" stroke="#1a0e04" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M76 62 Q85 60 94 64" stroke="#1a0e04" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- ══ 目 ══ -->
+  <!-- 左目 -->
+  <ellipse cx="55" cy="72" rx="9" ry="8" fill="white"/>
+  <ellipse cx="55" cy="72" rx="9" ry="8" fill="none" stroke="#c8904a" stroke-width="0.5"/>
+  <circle cx="56" cy="73" r="5.5" fill="#2c1608"/>
+  <circle cx="57.5" cy="71.2" r="3.2" fill="#0a0503"/>
+  <circle cx="59.5" cy="69.8" r="1.6" fill="white" opacity="0.9"/>
+  <circle cx="57" cy="73.5" r="0.8" fill="white" opacity="0.5"/>
+  <!-- 右目 -->
+  <ellipse cx="85" cy="72" rx="9" ry="8" fill="white"/>
+  <ellipse cx="85" cy="72" rx="9" ry="8" fill="none" stroke="#c8904a" stroke-width="0.5"/>
+  <circle cx="84" cy="73" r="5.5" fill="#2c1608"/>
+  <circle cx="85.5" cy="71.2" r="3.2" fill="#0a0503"/>
+  <circle cx="87.5" cy="69.8" r="1.6" fill="white" opacity="0.9"/>
+  <circle cx="85" cy="73.5" r="0.8" fill="white" opacity="0.5"/>
+  <!-- まつ毛（上） -->
+  <path d="M46 67 Q55 64 64 67" stroke="#1a0e04" stroke-width="1.2" fill="none"/>
+  <path d="M76 67 Q85 64 94 67" stroke="#1a0e04" stroke-width="1.2" fill="none"/>
+
+  <!-- ══ 鼻 ══ -->
+  <path d="M66 82 Q70 88 74 82" stroke="#c87a38" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <circle cx="66" cy="82" r="1.5" fill="#c87a38" opacity="0.6"/>
+  <circle cx="74" cy="82" r="1.5" fill="#c87a38" opacity="0.6"/>
+
+  <!-- ══ 口・笑顔（歯見え） ══ -->
+  <!-- 口の開き -->
+  <path d="M50 92 Q70 108 90 92 Q70 100 50 92Z" fill="#a04020"/>
+  <!-- 歯 -->
+  <path d="M52 93 Q70 105 88 93 Q70 100 52 93Z" fill="#fff" opacity="0.95"/>
+  <!-- 歯の分割線 -->
+  <line x1="70" y1="93" x2="70" y2="102" stroke="#ddd" stroke-width="0.7"/>
+  <line x1="61" y1="93.5" x2="61" y2="102" stroke="#ddd" stroke-width="0.5"/>
+  <line x1="79" y1="93.5" x2="79" y2="102" stroke="#ddd" stroke-width="0.5"/>
+  <!-- 上唇 -->
+  <path d="M50 92 Q60 89 70 90 Q80 89 90 92" stroke="#b05028" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- 口角ディンプル -->
+  <circle cx="49.5" cy="92" r="2.5" fill="#d07848"/>
+  <circle cx="90.5" cy="92" r="2.5" fill="#d07848"/>
+
+  <!-- ══ ほっぺた ══ -->
+  <ellipse cx="44" cy="86" rx="10" ry="7" fill="#f87171" opacity="0.28"/>
+  <ellipse cx="96" cy="86" rx="10" ry="7" fill="#f87171" opacity="0.28"/>
+
+</svg>`;
+
+function showCelebration() {
+  // 既存を除去
+  closeCelebration();
+
+  // ── オーバーレイ全体 ──
+  const ov = document.createElement('div');
+  ov.id = 'celebOverlay';
+  ov.onclick = closeCelebration;
+  Object.assign(ov.style, {
+    position   : 'fixed',
+    inset      : '0',
+    zIndex     : '9999',
+    display    : 'flex',
+    alignItems : 'center',
+    justifyContent: 'center',
+    background : 'linear-gradient(160deg,rgba(0,80,20,0.72),rgba(0,0,0,0.68))',
+    backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
+    cursor     : 'pointer',
+    animation  : 'celebFadeIn 0.25s ease both',
+  });
+
+  // ── コンテンツ中央 ──
+  const content = document.createElement('div');
+  Object.assign(content.style, {
+    display       : 'flex',
+    flexDirection : 'column',
+    alignItems    : 'center',
+    gap           : '0px',
+    animation     : 'celebPopUp 0.45s cubic-bezier(0.34,1.56,0.64,1) both',
+    pointerEvents : 'none',
+  });
+
+  // キャラクター
+  const charWrap = document.createElement('div');
+  charWrap.innerHTML = CHAR_SVG;
+  charWrap.style.cssText = 'line-height:0; position:relative; z-index:1;';
+
+  // 吹き出し
+  const bubble = document.createElement('div');
+  Object.assign(bubble.style, {
+    background   : '#fff',
+    borderRadius : '22px',
+    padding      : '18px 32px',
+    textAlign    : 'center',
+    boxShadow    : '0 12px 40px rgba(0,0,0,0.25)',
+    position     : 'relative',
+    marginTop    : '-8px',
+  });
+  bubble.innerHTML = `
+    <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+      width:0;height:0;border-left:14px solid transparent;
+      border-right:14px solid transparent;border-bottom:15px solid #fff"></div>
+    <p style="margin:0 0 6px;font-size:clamp(1.5rem,5vw,2.4rem);font-weight:900;
+      color:#15803d;letter-spacing:0.04em">お疲れ様！</p>
+    <p style="margin:0;font-size:clamp(0.85rem,2.5vw,1.1rem);font-weight:700;color:#4b7a5a">
+      今日もよく頑張りました&nbsp;🎉</p>`;
+
+  content.appendChild(charWrap);
+  content.appendChild(bubble);
+  ov.appendChild(content);
+  document.body.appendChild(ov);
+
+  // 紙吹雪
+  _spawnConfetti();
+
+  // 3.5秒後に自動消去
+  if (celebTimer) clearTimeout(celebTimer);
+  celebTimer = setTimeout(closeCelebration, 3500);
+}
+
+function closeCelebration() {
+  const ov = document.getElementById('celebOverlay');
+  if (ov) ov.remove();
+  document.querySelectorAll('.confetti-piece').forEach(el => el.remove());
+  if (celebTimer) { clearTimeout(celebTimer); celebTimer = null; }
+}
+
+function _spawnConfetti() {
+  const COLORS = ['#16a34a','#86efac','#4ade80','#fbbf24','#f59e0b','#a78bfa','#fb923c','#f472b6','#38bdf8','#fff'];
+  for (let i = 0; i < 80; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    const sz = 7 + Math.random() * 10;
+    p.style.cssText = [
+      `position:fixed`, `top:-15px`,
+      `left:${Math.random()*100}%`,
+      `width:${sz}px`, `height:${sz * (Math.random() > 0.4 ? 1 : 2.5)}px`,
+      `background:${COLORS[Math.floor(Math.random()*COLORS.length)]}`,
+      `border-radius:${Math.random()>0.5?'50%':'3px'}`,
+      `z-index:10000`,
+      `animation-delay:${Math.random()*0.8}s`,
+      `animation-duration:${1.5+Math.random()*1.8}s`,
+      `pointer-events:none`,
+    ].join(';');
+    document.body.appendChild(p);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NOTIFICATION SYSTEM
+// ═══════════════════════════════════════════════════════════
+let notifTimer = null;
+
+function startNotifChecker() {
+  if (notifTimer) clearInterval(notifTimer);
+  notifTimer = setInterval(checkNotifications, 60000);
+}
+
+async function requestNotifPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  const p = await Notification.requestPermission();
+  return p === 'granted';
+}
+
+// アプリアイコン (canvas → data URL)
+function getAppIconDataURL() {
+  const c = document.createElement('canvas'); c.width = c.height = 192;
+  const g = c.getContext('2d');
+  // 緑背景
+  g.fillStyle = '#16a34a';
+  g.beginPath(); g.roundRect(0,0,192,192,36); g.fill();
+  // 白いクリップボード本体
+  g.fillStyle = 'rgba(255,255,255,0.95)';
+  g.beginPath(); g.roundRect(42,54,108,118,14); g.fill();
+  // 上タブ
+  g.fillStyle = '#0d7a36';
+  g.beginPath(); g.roundRect(68,36,56,34,10); g.fill();
+  // チェックマーク(緑)
+  g.strokeStyle = '#16a34a'; g.lineWidth = 14; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(62,112); g.lineTo(86,138); g.lineTo(130,88); g.stroke();
+  return c.toDataURL();
+}
+let _appIconURL = null;
+function appIconURL() { return _appIconURL || (_appIconURL = getAppIconDataURL()); }
+
+function checkNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now   = new Date();
+  const hhmm  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const todayK = dateKey(now);
+  const data  = loadData();
+  if (!data.notifications) return;
+
+  (data.supplements || []).forEach(s => {
+    const n = data.notifications[s.id];
+    if (!n || !n.enabled || n.time !== hhmm) return;
+    if (!shouldNotifyToday(n, todayK)) return;
+    const msg = n.message || 'タスクは完了しましたか？';
+    try { new Notification(s.name, { body: msg, icon: appIconURL() }); } catch(e){}
+    data.notifications[s.id].lastNotified = todayK;
+    saveData(data);
+  });
+}
+
+function shouldNotifyToday(n, todayK) {
+  if (n.frequency === 'always') return true;
+  if (!n.lastNotified) return true;
+  const diffDays = Math.round(
+    (new Date(todayK+'T00:00:00') - new Date(n.lastNotified+'T00:00:00')) / 86400000
+  );
+  return diffDays >= ({ daily:1, '2days':2, '3days':3, weekly:7, monthly:30 }[n.frequency] || 1);
+}
+
+function openNotifModal() {
+  const data = loadData();
+  const n = data.notifications?.[activeSuppId] || {};
+  document.getElementById('notifEnabled').checked   = !!n.enabled;
+  document.getElementById('notifFreq').value        = n.frequency || 'daily';
+  document.getElementById('notifTime').value        = n.time || '09:00';
+  document.getElementById('notifMessage').value     = n.message  || '';
+  applyNotifDetailsOpacity(!!n.enabled);
+  document.getElementById('notifModal').classList.remove('hidden');
+}
+
+function closeNotifModal() {
+  document.getElementById('notifModal').classList.add('hidden');
+}
+
+async function saveNotifSettings() {
+  const enabled = document.getElementById('notifEnabled').checked;
+  if (enabled) {
+    const ok = await requestNotifPermission();
+    if (!ok) {
+      alert('通知の許可が必要です。\nブラウザの設定から通知を許可してください。');
+      return;
+    }
+  }
+  const data = loadData();
+  if (!data.notifications) data.notifications = {};
+  data.notifications[activeSuppId] = {
+    enabled,
+    frequency : document.getElementById('notifFreq').value,
+    time      : document.getElementById('notifTime').value,
+    message   : document.getElementById('notifMessage').value.trim() || 'タスクは完了しましたか？',
+    lastNotified: data.notifications[activeSuppId]?.lastNotified || null
+  };
+  saveData(data);
+  closeNotifModal();
+  if (enabled) startNotifChecker();
+  updateNotifBell();
+}
+
+async function sendTestNotif() {
+  const ok = await requestNotifPermission();
+  if (!ok) { alert('通知の許可が必要です。'); return; }
+  const msg = document.getElementById('notifMessage').value.trim() || 'タスクは完了しましたか？';
+  const data = loadData();
+  const name = data.supplements.find(s => s.id === activeSuppId)?.name || 'タスク';
+  try { new Notification(name, { body: msg, icon: appIconURL() }); } catch(e) {
+    alert('通知を送信しました（または送信に失敗しました）。');
+  }
+}
+
+function updateNotifBell() {
+  const data = loadData();
+  const n = data.notifications?.[activeSuppId];
+  const el = document.getElementById('notifBellIcon');
+  if (el) el.textContent = n?.enabled ? '🔔' : '🔕';
+}
+
+function applyNotifDetailsOpacity(enabled) {
+  const d = document.getElementById('notifDetails');
+  if (!d) return;
+  d.style.opacity = enabled ? '1' : '0.4';
+  d.style.pointerEvents = enabled ? 'auto' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  EVENT LISTENERS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btnAdd').onclick       = () => openModal('add');
+document.getElementById('btnEmptyAdd').onclick  = () => openModal('add');
+document.getElementById('btnSelect').onclick    = toggleEditMode;
+document.getElementById('btnBack').onclick      = goHome;
+document.getElementById('btnEditSupp').onclick  = () => openModal('edit', activeSuppId);
+document.getElementById('btnModalCancel').onclick = closeModal;
+document.getElementById('modalBackdrop').onclick  = closeModal;
+document.getElementById('btnModalSave').onclick   = saveModal;
+document.getElementById('btnModalDelete').onclick = deleteSupp;
+
+// 時刻ピッカー
+document.getElementById('tpClose').onclick  = closeTimePicker;
+document.getElementById('tpSave').onclick   = saveTimePicker;
+document.getElementById('tpToggle').onclick = toggleDoneInPicker;
+document.querySelectorAll('.tp-tab').forEach(tab => {
+  tab.onclick = () => switchTpMode(tab.dataset.mode);
+});
+document.addEventListener('click', e => {
+  const popup = document.getElementById('timePicker');
+  if (!popup.classList.contains('hidden') && !popup.contains(e.target)) closeTimePicker();
+});
+
+// 通知
+document.getElementById('btnNotif').onclick       = openNotifModal;
+document.getElementById('btnNotifCancel').onclick  = closeNotifModal;
+document.getElementById('notifBackdrop').onclick   = closeNotifModal;
+document.getElementById('btnNotifSave').onclick    = saveNotifSettings;
+document.getElementById('btnTestNotif').onclick    = sendTestNotif;
+document.getElementById('notifEnabled').onchange   = e => applyNotifDetailsOpacity(e.target.checked);
+
+document.getElementById('prevMonth').onclick = () => {
+  const d = loadData(), logs = d.logs[activeSuppId]||{};
+  if (--viewMonth.m < 0) { viewMonth.m=11; viewMonth.y--; }
+  renderMonth(logs);
+};
+document.getElementById('nextMonth').onclick = () => {
+  const d = loadData(), logs = d.logs[activeSuppId]||{};
+  if (++viewMonth.m > 11) { viewMonth.m=0; viewMonth.y++; }
+  renderMonth(logs);
+};
+
+// Enter key on name input
+document.getElementById('inputName').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveModal();
+});
+// 入力開始でエラーを消す
+document.getElementById('inputName').addEventListener('input', _clearNameError);
+
+// ═══════════════════════════════════════════════════════════
+//  MEMO
+// ═══════════════════════════════════════════════════════════
+let memoTimer = null;
+
+function renderMemo(suppId) {
+  const data = loadData();
+  const memo = data.memos?.[suppId] || '';
+  const ta   = document.getElementById('detailMemo');
+  ta.value   = memo;
+
+  // 既存のリスナーを削除してから再登録
+  ta.oninput = () => {
+    clearTimeout(memoTimer);
+    memoTimer = setTimeout(() => {
+      const d = loadData();
+      if (!d.memos) d.memos = {};
+      d.memos[suppId] = ta.value;
+      saveData(d);
+    }, 600); // 600ms後に自動保存
+  };
+}
+
+// ─── Service Worker ───
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+
+// ─── Init ───
+renderHome();
+startNotifChecker(); // 通知チェッカー起動
+</script>
+</body>
+</html>
