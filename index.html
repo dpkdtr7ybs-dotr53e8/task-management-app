@@ -802,6 +802,17 @@
     }
     .auth-card .form-group input[type="email"]:focus,
     .auth-card .form-group input[type="password"]:focus { border-color: #16a34a; }
+    /* アカウント削除フッター */
+    .account-footer {
+      text-align: center; padding: 24px 16px 36px;
+    }
+    .btn-delete-account {
+      background: none; border: none;
+      font-size: 0.78rem; color: #ccc; cursor: pointer;
+      text-decoration: underline; padding: 8px 12px;
+      transition: color 0.2s;
+    }
+    .btn-delete-account:hover { color: #dc2626; }
     /* 同期インジケーター */
     .sync-badge {
       font-size: 0.68rem; font-weight: 700; color: #86b898;
@@ -842,6 +853,10 @@
     <div class="empty-icon">✅</div>
     <p>タスクを追加してください</p>
     <button class="btn-start" id="btnEmptyAdd">＋ 追加する</button>
+  </div>
+
+  <div class="account-footer">
+    <button id="btnDeleteAccount" class="btn-delete-account" onclick="deleteAccount()">アカウントを削除する</button>
   </div>
 
 </div>
@@ -1190,6 +1205,23 @@ async function submitAuth() {
 async function signOut() {
   if (!confirm('ログアウトしますか？')) return;
   await sb.auth.signOut();
+}
+
+// ── アカウント削除 ──
+async function deleteAccount() {
+  const first = confirm('アカウントを削除しますか？\nすべてのデータが完全に削除されます。');
+  if (!first) return;
+  const second = confirm('本当に削除しますか？\nこの操作は取り消せません。');
+  if (!second) return;
+  try {
+    const { error } = await sb.rpc('delete_my_account');
+    if (error) throw error;
+    localStorage.removeItem(STORAGE_KEY);
+    alert('アカウントを削除しました。');
+    await sb.auth.signOut();
+  } catch(e) {
+    alert('削除に失敗しました。もう一度お試しください。');
+  }
 }
 const today       = new Date(); today.setHours(0,0,0,0);
 
