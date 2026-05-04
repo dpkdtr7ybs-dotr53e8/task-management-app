@@ -788,6 +788,20 @@
     }
     .auth-msg.error   { color: #dc2626; background: #fff5f5; padding: 8px; }
     .auth-msg.success { color: #15803d; background: #f0fdf4; padding: 8px; }
+    /* 認証フォーム専用: ラベルと入力欄を大きく */
+    .auth-card .form-group label {
+      font-size: 1.1rem !important; letter-spacing: 0.04em; text-transform: none;
+    }
+    .auth-card .form-group input[type="email"],
+    .auth-card .form-group input[type="password"] {
+      width: 100%; border: 1.5px solid #d1edd9;
+      border-radius: 12px; padding: 14px 16px;
+      font-size: 1.3rem; color: #1a3a22; background: #f9fefb;
+      outline: none; font-family: inherit;
+      box-sizing: border-box;
+    }
+    .auth-card .form-group input[type="email"]:focus,
+    .auth-card .form-group input[type="password"]:focus { border-color: #16a34a; }
     /* 同期インジケーター */
     .sync-badge {
       font-size: 0.68rem; font-weight: 700; color: #86b898;
@@ -1049,7 +1063,7 @@
 
     <div id="authMsg" class="auth-msg"></div>
 
-    <button id="btnAuthSubmit" class="btn-save" style="width:100%;padding:14px;margin-top:4px;font-size:1rem" onclick="submitAuth()">
+    <button id="btnAuthSubmit" class="btn-save" style="width:100%;padding:16px;margin-top:4px;font-size:1.2rem" onclick="submitAuth()">
       ログイン
     </button>
   </div>
