@@ -2393,7 +2393,29 @@ if ('serviceWorker' in navigator) {
 }
 
 // ─── Init ───
-initAuth(); // 認証チェック → ログイン済みなら自動でrenderHome()
+// メール確認リンクから飛んできた場合（#access_token が URL に含まれる）
+if (window.location.hash.includes('access_token') && window.location.hash.includes('type=signup')) {
+  // Supabase がセッションを処理して他タブに通知する
+  // → 元のタブの onAuthStateChange が SIGNED_IN を受け取り自動ログイン
+  document.body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;
+      height:100vh;background:linear-gradient(160deg,#f0fdf4,#f4faf6);
+      font-family:-apple-system,sans-serif;">
+      <div style="text-align:center;padding:40px 32px;background:#fff;
+        border-radius:24px;box-shadow:0 8px 32px rgba(22,163,74,0.12);
+        border:1.5px solid #d1edd9;max-width:320px;">
+        <div style="font-size:3rem;margin-bottom:12px;">✅</div>
+        <h2 style="color:#16a34a;margin:0 0 10px;font-size:1.3rem;">メール認証完了！</h2>
+        <p style="color:#4b7a5a;margin:0;font-size:0.95rem;line-height:1.6;">
+          このタブを閉じて、<br>元のタスク管理のタブに戻ってください。
+        </p>
+      </div>
+    </div>`;
+  // セッションを処理して元タブに反映
+  if (sb) sb.auth.getSession();
+} else {
+  initAuth(); // 認証チェック → ログイン済みなら自動でrenderHome()
+}
 </script>
 </body>
 </html>
