@@ -804,6 +804,11 @@
     .auth-card .form-group input[type="password"]:focus { border-color: #16a34a; }
     /* アカウント削除フッター */
     .account-footer { display: none; }
+    .current-user-email {
+      font-size: 0.72rem; color: #86b898; font-weight: 600;
+      max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; flex: 1; text-align: right;
+    }
     .btn-delete-account {
       background: none; border: none;
       font-size: 0.75rem; color: #b0ccb8; cursor: pointer;
@@ -835,6 +840,7 @@
       </svg>
       <h1>タスク管理</h1>
     </div>
+    <span id="currentUserEmail" class="current-user-email"></span>
     <button class="btn-delete-account" id="btnDeleteAccount" onclick="deleteAccount()">削除</button>
     <button class="icon-btn" id="btnLogout" aria-label="ログアウト" title="ログアウト" style="color:#86b898">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1146,6 +1152,9 @@ async function initAuth() {
 function _showApp() {
   document.getElementById('view-auth').classList.add('hidden');
   history.replaceState({ page: 'home' }, '');
+  // ログイン中のメールアドレスを表示
+  const emailEl = document.getElementById('currentUserEmail');
+  if (emailEl && currentUser?.email) emailEl.textContent = currentUser.email;
   renderHome();
   startNotifChecker();
 }
