@@ -1155,6 +1155,18 @@ function _showAuthScreen() {
   document.getElementById('view-home').classList.remove('pushed');
   document.getElementById('view-detail').classList.remove('active');
   history.replaceState({ page: 'auth' }, '');
+  // フォームをリセット
+  const btn = document.getElementById('btnAuthSubmit');
+  btn.textContent = 'ログイン';
+  btn.disabled = false;
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+  const msg = document.getElementById('authMsg');
+  msg.textContent = '';
+  msg.className = 'auth-msg';
+  authMode = 'signin';
+  document.getElementById('tabSignIn').classList.add('auth-tab-active');
+  document.getElementById('tabSignUp').classList.remove('auth-tab-active');
 }
 
 // ── 認証モード切替 ──
