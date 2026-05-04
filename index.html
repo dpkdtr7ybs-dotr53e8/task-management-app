@@ -1940,11 +1940,8 @@ function setDrumTime(hId, mId, timeStr) {
   if (timeStr && /^\d{2}:\d{2}$/.test(timeStr)) {
     [h, m] = timeStr.split(':').map(Number);
   }
-  // requestAnimationFrame で DOM 描画後にスクロール
-  requestAnimationFrame(() => {
-    setDrum(document.getElementById(hId), h);
-    setDrum(document.getElementById(mId), m);
-  });
+  setDrum(document.getElementById(hId), h);
+  setDrum(document.getElementById(mId), m);
 }
 
 let tpMode = 'time'; // 'time' | 'range'
@@ -1963,21 +1960,6 @@ function openTimePicker(suppId, dk, cellEl) {
   document.getElementById('tpTitle').textContent =
     `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
 
-  // モード初期化（既存データに合わせて）
-  tpMode = (info?.type === 'range') ? 'range' : 'time';
-  switchTpMode(tpMode);
-
-  // 値設定（ドラムピッカー）
-  if (info?.type === 'range') {
-    setDrumTime('drumStartH', 'drumStartM', info.start || '');
-    setDrumTime('drumEndH',   'drumEndM',   info.end   || '');
-    setDrumTime('drumTimeH',  'drumTimeM',  '');
-  } else {
-    setDrumTime('drumTimeH', 'drumTimeM', info?.time || '');
-    setDrumTime('drumStartH','drumStartM', '');
-    setDrumTime('drumEndH',  'drumEndM',   '');
-  }
-
   // 完了ボタン
   const btn = document.getElementById('tpToggle');
   btn.textContent     = done ? '完了を取り消す' : '完了にする';
@@ -1985,11 +1967,10 @@ function openTimePicker(suppId, dk, cellEl) {
   btn.style.borderColor = done ? '#fecaca' : '#bbf7d0';
   btn.dataset.done    = done ? 'true' : 'false';
 
-  // 表示位置
+  // ① 先にポップアップを表示（display:none 中は scrollTop が効かないため）
   const popup = document.getElementById('timePicker');
-  popup.classList.remove('hidden');
   const rect = cellEl.getBoundingClientRect();
-  const pw = 268, ph = 200;
+  const pw = 300, ph = 260;
   let left = rect.left + rect.width / 2 - pw / 2;
   let top  = rect.bottom + 8;
   if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
@@ -1998,6 +1979,21 @@ function openTimePicker(suppId, dk, cellEl) {
   if (top < 8) top = 8;
   popup.style.left = left + 'px';
   popup.style.top  = top  + 'px';
+  popup.classList.remove('hidden');
+
+  // ② モード切替（表示後）
+  tpMode = (info?.type === 'range') ? 'range' : 'time';
+  switchTpMode(tpMode);
+
+  // ③ DOM 描画後にスクロール値をセット
+  setTimeout(() => {
+    if (info?.type === 'range') {
+      setDrumTime('drumStartH', 'drumStartM', info.start || '');
+      setDrumTime('drumEndH',   'drumEndM',   info.end   || '');
+    } else {
+      setDrumTime('drumTimeH', 'drumTimeM', info?.time || '');
+    }
+  }, 30);
 }
 
 function switchTpMode(mode) {
