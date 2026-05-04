@@ -1148,6 +1148,7 @@ async function initAuth() {
 
 function _showApp() {
   document.getElementById('view-auth').classList.add('hidden');
+  history.replaceState({ page: 'home' }, '');
   renderHome();
   startNotifChecker();
 }
@@ -1156,6 +1157,7 @@ function _showAuthScreen() {
   document.getElementById('view-auth').classList.remove('hidden');
   document.getElementById('view-home').classList.remove('pushed');
   document.getElementById('view-detail').classList.remove('active');
+  history.replaceState({ page: 'auth' }, '');
 }
 
 // ── 認証モード切替 ──
@@ -1339,12 +1341,33 @@ function goDetail(suppId) {
   document.getElementById('view-home').classList.add('pushed');
   document.getElementById('view-detail').classList.add('active');
   document.getElementById('view-detail').scrollTop = 0;
+  // ブラウザ履歴に追加
+  history.pushState({ page: 'detail', suppId }, '');
 }
 function goHome() {
   document.getElementById('view-home').classList.remove('pushed');
   document.getElementById('view-detail').classList.remove('active');
   renderHome();
 }
+function _goHomeUI() {
+  document.getElementById('view-home').classList.remove('pushed');
+  document.getElementById('view-detail').classList.remove('active');
+  renderHome();
+}
+// ブラウザの戻る/進むボタン対応
+window.addEventListener('popstate', (e) => {
+  const page = e.state?.page;
+  if (page === 'detail' && e.state?.suppId) {
+    activeSuppId = e.state.suppId;
+    viewMonth = { y: today.getFullYear(), m: today.getMonth() };
+    renderDetail();
+    document.getElementById('view-home').classList.add('pushed');
+    document.getElementById('view-detail').classList.add('active');
+    document.getElementById('view-detail').scrollTop = 0;
+  } else {
+    _goHomeUI();
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 //  MODAL
@@ -2276,7 +2299,7 @@ document.getElementById('btnAdd').onclick       = () => openModal('add');
 document.getElementById('btnEmptyAdd').onclick  = () => openModal('add');
 document.getElementById('btnLogout').onclick    = signOut;
 document.getElementById('btnSelect').onclick    = toggleEditMode;
-document.getElementById('btnBack').onclick      = goHome;
+document.getElementById('btnBack').onclick      = () => history.back();
 document.getElementById('btnEditSupp').onclick  = () => openModal('edit', activeSuppId);
 document.getElementById('btnModalCancel').onclick = closeModal;
 document.getElementById('modalBackdrop').onclick  = closeModal;
