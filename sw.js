@@ -1,4 +1,4 @@
-const CACHE = 'task-v4';
+const CACHE = 'task-v5';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

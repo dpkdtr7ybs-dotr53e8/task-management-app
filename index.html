@@ -1067,7 +1067,9 @@ const DAY_NAMES   = ['日','月','火','水','木','金','土'];
 // ═══════════════════════════════════════════════════════════
 const SUPABASE_URL = 'https://qomnhivorverqqwlmocw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvbW5oaXZvcnZlcnFxd2xtb2N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NDU1MDAsImV4cCI6MjA5MzQyMTUwMH0.h2SNBlF9rRGX7DefT242nJ_HivKXbWggpfKcPdR5fnc';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = (typeof supabase !== 'undefined')
+  ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
 
 let currentUser = null;
 let authMode    = 'signin'; // 'signin' | 'signup'
