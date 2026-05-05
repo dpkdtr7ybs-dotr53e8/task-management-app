@@ -592,12 +592,17 @@
       scroll-snap-type: y mandatory;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
+      position: relative; z-index: 3; /* drum-highlight(z-index:1)より前面に */
     }
     .drum-col::-webkit-scrollbar { display: none; }
     .drum-item {
       height: 44px; display: flex; align-items: center; justify-content: center;
-      font-size: 1.35rem; font-weight: 700; color: #1a3a22;
+      font-size: 1.5rem; font-weight: 700; color: #4b7a5a;
       scroll-snap-align: center; user-select: none; cursor: pointer;
+    }
+    /* 中央の選択アイテムを強調 */
+    .drum-item.drum-selected {
+      font-size: 1.7rem; font-weight: 900; color: #15803d;
     }
     .drum-item.drum-pad { color: transparent; pointer-events: none; }
     .drum-sep {
@@ -1912,9 +1917,16 @@ function buildDrum(colEl, count) {
 }
 
 function setDrum(colEl, value) {
-  // data属性にも保存しておき、scroll途中でも正しい値を返せるようにする
   colEl.dataset.val = value;
   colEl.scrollTo({ top: value * DRUM_ITEM_H, behavior: 'instant' });
+  _updateDrumHighlight(colEl, value);
+}
+
+function _updateDrumHighlight(colEl, value) {
+  // 全itemからdrum-selectedを除去し、中央アイテムに付与
+  colEl.querySelectorAll('.drum-item').forEach((el, i) => {
+    el.classList.toggle('drum-selected', i === value + 1); // +1はpadTop分
+  });
 }
 
 function getDrum(colEl) {
@@ -1944,13 +1956,17 @@ function initAllDrums() {
     buildDrum(el, count);
     // 手動スクロール後にdata属性を更新
     el.addEventListener('scrollend', () => {
-      el.dataset.val = Math.round(el.scrollTop / DRUM_ITEM_H);
+      const v = Math.round(el.scrollTop / DRUM_ITEM_H);
+      el.dataset.val = v;
+      _updateDrumHighlight(el, v);
     });
     // scrollend非対応ブラウザ向け
     el.addEventListener('scroll', () => {
       clearTimeout(el._scrollTimer);
       el._scrollTimer = setTimeout(() => {
-        el.dataset.val = Math.round(el.scrollTop / DRUM_ITEM_H);
+        const v = Math.round(el.scrollTop / DRUM_ITEM_H);
+        el.dataset.val = v;
+        _updateDrumHighlight(el, v);
       }, 150);
     });
   });
