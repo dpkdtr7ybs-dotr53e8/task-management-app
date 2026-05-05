@@ -1912,11 +1912,19 @@ function buildDrum(colEl, count) {
 }
 
 function setDrum(colEl, value) {
-  // scroll-snap で value 番目のアイテムを中央に
-  colEl.scrollTop = value * DRUM_ITEM_H;
+  // data属性にも保存しておき、scroll途中でも正しい値を返せるようにする
+  colEl.dataset.val = value;
+  colEl.scrollTo({ top: value * DRUM_ITEM_H, behavior: 'instant' });
 }
 
 function getDrum(colEl) {
+  // scroll-snap 完了前でも正しい値を取得するため data属性を優先
+  if (colEl.dataset.val !== undefined) {
+    const snap = Math.round(colEl.scrollTop / DRUM_ITEM_H);
+    const preset = parseInt(colEl.dataset.val, 10);
+    // scrollTopが設定値に十分近ければ確定値を返す
+    return Math.abs(snap - preset) <= 1 ? snap : preset;
+  }
   return Math.round(colEl.scrollTop / DRUM_ITEM_H);
 }
 
@@ -1926,12 +1934,26 @@ function parseDrumTime(hEl, mEl) {
 }
 
 function initAllDrums() {
-  buildDrum(document.getElementById('drumTimeH'),  24);
-  buildDrum(document.getElementById('drumTimeM'),  60);
-  buildDrum(document.getElementById('drumStartH'), 24);
-  buildDrum(document.getElementById('drumStartM'), 60);
-  buildDrum(document.getElementById('drumEndH'),   24);
-  buildDrum(document.getElementById('drumEndM'),   60);
+  const drums = [
+    ['drumTimeH', 24], ['drumTimeM', 60],
+    ['drumStartH', 24], ['drumStartM', 60],
+    ['drumEndH', 24], ['drumEndM', 60]
+  ];
+  drums.forEach(([id, count]) => {
+    const el = document.getElementById(id);
+    buildDrum(el, count);
+    // 手動スクロール後にdata属性を更新
+    el.addEventListener('scrollend', () => {
+      el.dataset.val = Math.round(el.scrollTop / DRUM_ITEM_H);
+    });
+    // scrollend非対応ブラウザ向け
+    el.addEventListener('scroll', () => {
+      clearTimeout(el._scrollTimer);
+      el._scrollTimer = setTimeout(() => {
+        el.dataset.val = Math.round(el.scrollTop / DRUM_ITEM_H);
+      }, 150);
+    });
+  });
 }
 
 function setDrumTime(hId, mId, timeStr) {
@@ -1985,7 +2007,7 @@ function openTimePicker(suppId, dk, cellEl) {
   tpMode = (info?.type === 'range') ? 'range' : 'time';
   switchTpMode(tpMode);
 
-  // ③ DOM 描画後にスクロール値をセット
+  // ③ DOM 描画後にスクロール値をセット（100ms待って確実に反映）
   setTimeout(() => {
     if (info?.type === 'range') {
       setDrumTime('drumStartH', 'drumStartM', info.start || '');
@@ -1993,7 +2015,7 @@ function openTimePicker(suppId, dk, cellEl) {
     } else {
       setDrumTime('drumTimeH', 'drumTimeM', info?.time || '');
     }
-  }, 30);
+  }, 100);
 }
 
 function switchTpMode(mode) {
@@ -2493,7 +2515,7 @@ if ('serviceWorker' in navigator) {
 
 // ─── Init ───
 // メール確認リンクから飛んできた場合（#access_token が URL に含まれる）
-if (window.location.hash.includes('access_token') && window.location.hash.includes('type=signup')) {
+if (window.location.hash.includes('access_token')) {
   // Supabase がセッションを処理して他タブに通知する
   // → 元のタブの onAuthStateChange が SIGNED_IN を受け取り自動ログイン
   document.body.innerHTML = `
