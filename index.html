@@ -315,6 +315,8 @@
     #streakCard.hot { border-color: #fde68a; }
     #totalCard .sc-num { color: #0d9488; }
     #totalCard { border-color: #ccfbf1; }
+    #timeCard .sc-num { color: #7c3aed; font-size: 1.1rem; }
+    #timeCard { border-color: #ede9fe; }
 
     /* ═══════════════════════════════ DETAIL ─ WEEK ═══ */
     .week-section { }
@@ -536,8 +538,13 @@
       color: #4b7a5a; background: rgba(255,255,255,0.7);
       border-radius: 6px; padding: 1px 5px;
       white-space: nowrap; margin-top: 2px;
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+    }
+    .week-dur {
+      font-size: 0.85em; color: #7c3aed; font-weight: 800;
     }
     [class*="taken-"] .week-time-info { color: rgba(255,255,255,0.9); background: rgba(0,0,0,0.15); }
+    [class*="taken-"] .week-dur { color: #e9d5ff; }
 
     /* ═══════════════════════════════ TIME PICKER POPUP ═══ */
     .tp-popup {
@@ -950,6 +957,11 @@
         <span class="sc-icon">✅</span>
         <span class="sc-num" id="scTotal">0</span>
         <span class="sc-unit">合計日数</span>
+      </div>
+      <div class="stat-card" id="timeCard">
+        <span class="sc-icon">⏱️</span>
+        <span class="sc-num sc-time" id="scTime">0</span>
+        <span class="sc-unit">合計時間</span>
       </div>
     </div>
 
@@ -1397,6 +1409,44 @@ function getCurrentStreak(logs) {
 function getTotal(logs) { return Object.keys(logs).filter(k => isDone(logs[k])).length; }
 function streakClass(s) { return s > 0 ? 'taken-'+Math.min(s,10) : ''; }
 
+// 1件のログから所要時間（分）を計算
+function calcDurationMin(val) {
+  const info = getTimeInfo(val);
+  if (!info || info.type !== 'range') return null;
+  const [sh, sm] = info.start.split(':').map(Number);
+  const [eh, em] = info.end.split(':').map(Number);
+  let mins = (eh * 60 + em) - (sh * 60 + sm);
+  if (mins < 0) mins += 24 * 60; // 日跨ぎ対応
+  return mins;
+}
+
+// 分を「Xh Ym」or「Y分」に整形
+function formatDuration(mins) {
+  if (mins === null || mins <= 0) return null;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h > 0 && m > 0) return `${h}h${m}m`;
+  if (h > 0) return `${h}時間`;
+  return `${m}分`;
+}
+
+// 全ログの合計時間（分）
+function getTotalMins(logs) {
+  return Object.values(logs).reduce((acc, v) => {
+    const m = calcDurationMin(v);
+    return acc + (m || 0);
+  }, 0);
+}
+
+// 合計時間を「Xh Ym」形式で
+function formatTotalTime(logs) {
+  const mins = getTotalMins(logs);
+  if (mins <= 0) return '0分';
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}時間`;
+  return `${m}分`;
+}
+
 // ═══════════════════════════════════════════════════════════
 //  NAVIGATION
 // ═══════════════════════════════════════════════════════════
@@ -1751,6 +1801,7 @@ function renderDetail() {
   const total  = getTotal(logs);
   document.getElementById('scNum').textContent   = streak;
   document.getElementById('scTotal').textContent = total;
+  document.getElementById('scTime').textContent  = formatTotalTime(logs);
   const card = document.getElementById('streakCard');
   const icon = document.getElementById('scIcon');
   if (streak >= 7) { card.classList.add('hot'); icon.textContent='🔥'; }
@@ -1796,6 +1847,8 @@ function renderWeek(logs) {
     const logVal   = logs[dk];
     const taken    = isDone(logVal);
     const timeDisp = getTimeDisplay(logVal);
+    const durMin   = calcDurationMin(logVal);
+    const durStr   = formatDuration(durMin);
 
     const cell = document.createElement('div');
     cell.className = ['week-cell', isToday?'today':'', isFuture?'future':'', streakClass(streak)]
@@ -1804,9 +1857,9 @@ function renderWeek(logs) {
     const badge = streak >= 2
       ? `<span class="streak-badge">${streak>=7?'🔥'+streak:streak+'連'}</span>` : '';
 
-    // 時刻表示（あれば）
+    // 時刻＋所要時間表示
     const timeHTML = timeDisp
-      ? `<span class="week-time-info">${timeDisp}</span>` : '';
+      ? `<span class="week-time-info">${timeDisp}${durStr ? `<span class="week-dur"> ${durStr}</span>` : ''}</span>` : '';
 
     cell.innerHTML = `${badge}
       <span class="day-name">${DAY_NAMES[d.getDay()]}</span>
